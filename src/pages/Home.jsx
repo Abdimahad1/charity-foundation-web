@@ -35,40 +35,79 @@ const toAbs = (u) => {
 
 // Robust media URL normalizer for images coming from DB
 const toMediaUrl = (u) => {
-  if (!u) return "";
-  // keep data/blob as-is
-  if (/^(data:|blob:)/i.test(u)) return u;
-
-  // normalize slashes & trim
-  let s = String(u).trim().replace(/\\/g, "/");
-
-  // If some records accidentally saved 'api/uploads/..' ensure it starts with a slash for URL()
-  if (!/^https?:\/\//i.test(s) && !s.startsWith("/")) s = `/${s}`;
-
-  let url;
-  try {
-    // Build with API_ORIGIN as base so we can easily compare/override origin
-    url = new URL(s, API_ORIGIN);
-  } catch {
+  if (!u) {
+    console.debug('[toMediaUrl] Empty input');
     return "";
   }
 
-  // Clean '/api' before '/uploads'
+  // Debug original input
+  console.debug('[toMediaUrl] Original input:', u);
+
+  // keep data/blob as-is
+  if (/^(data:|blob:)/i.test(u)) {
+    console.debug('[toMediaUrl] Data/blob URL - returning as-is');
+    return u;
+  }
+
+  // normalize slashes & trim
+  let s = String(u).trim().replace(/\\/g, "/");
+  console.debug('[toMediaUrl] After normalization:', s);
+
+  // Handle common cases explicitly
+  if (/^https?:\/\//i.test(s)) {
+    console.debug('[toMediaUrl] Already absolute URL - returning as-is');
+    return s;
+  }
+
+  // Special handling for common backend paths
+  if (s.startsWith('uploads/') || s.startsWith('/uploads/')) {
+    const result = `${API_ORIGIN}/${s.replace(/^\/+/, '')}`;
+    console.debug('[toMediaUrl] Uploads path - transformed to:', result);
+    return result;
+  }
+
+  // Handle potential API path prefixes
+  if (s.startsWith('api/') || s.startsWith('/api/')) {
+    s = s.replace(/^\/?api\//, '');
+  }
+
+  let url;
+  try {
+    console.debug('[toMediaUrl] Attempting to construct URL from:', s, 'with base:', API_ORIGIN);
+    url = new URL(s, API_ORIGIN);
+  } catch (err) {
+    console.error('[toMediaUrl] URL construction failed:', err);
+    return "";
+  }
+
+  // Clean '/api' before '/uploads' if present
   const cleanPath = url.pathname.replace(/\/api(?=\/uploads\/)/, "");
   const qs = url.search || "";
 
-  // If path is under /uploads, ALWAYS serve from our API_ORIGIN to avoid mixed content & wrong hosts
+  console.debug('[toMediaUrl] Constructed URL components:', {
+    origin: url.origin,
+    pathname: url.pathname,
+    cleanPath,
+    search: url.search
+  });
+
+  // Special case for uploads - always serve from our origin
   if (/\/uploads\//.test(cleanPath)) {
-    return `${API_ORIGIN}${cleanPath}${qs}`;
+    const result = `${API_ORIGIN}${cleanPath}${qs}`;
+    console.debug('[toMediaUrl] Uploads path detected - final URL:', result);
+    return result;
   }
 
-  // If we somehow got a root path from another origin, still prefer our API_ORIGIN
+  // If path is from another origin but is root-relative, use our origin
   if (url.origin !== API_ORIGIN && cleanPath.startsWith("/")) {
-    return `${API_ORIGIN}${cleanPath}${qs}`;
+    const result = `${API_ORIGIN}${cleanPath}${qs}`;
+    console.debug('[toMediaUrl] Foreign origin with root path - final URL:', result);
+    return result;
   }
 
-  // Otherwise, return normalized absolute URL
-  return `${url.origin}${cleanPath}${qs}`;
+  const finalUrl = `${url.origin}${cleanPath}${qs}`;
+  console.debug('[toMediaUrl] Final URL:', finalUrl);
+  return finalUrl;
 };
 
 /* ==================== Icons (inline SVG) ==================== */
