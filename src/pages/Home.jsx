@@ -224,103 +224,156 @@ export default function Home() {
     return dt.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
   };
 
-  /* -------- Fetch slides (published, sorted, max 3) -------- */
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const url = `${API_BASE}/slides`;
-        const res = await fetch(url, { cache: "no-store" }); // no custom headers => no preflight CORS issue
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const raw = await res.json();
+ /* -------- Fetch slides (published, sorted, max 3) -------- */
+useEffect(() => {
+  let mounted = true;
+  (async () => {
+    try {
+      const res = await fetch(`${API_BASE}/slides`, { cache: "no-store" }); // no custom headers => no preflight
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const raw = await res.json();
 
-        const arr = Array.isArray(raw) ? raw : raw.items || raw.slides || [];
-        const published = arr
-          .filter((s) => s?.published === true)
-          .sort((a, b) => (a.position || 0) - (b.position || 0))
-          .slice(0, 3);
+      const arr = Array.isArray(raw) ? raw : raw.items || raw.slides || [];
+      const published = arr
+        .filter((s) => s?.published === true)
+        .sort((a, b) => (a.position || 0) - (b.position || 0))
+        .slice(0, 3);
 
-        // Normalize
-        const normalizedSlides = published.map((s, i) => ({
-          id: s._id || s.id || i,
-          src: toMediaUrl(
-            s.src ||
-              s.image ||
-              s.url ||
-              s.file?.url ||
-              (Array.isArray(s.images) && (s.images[0]?.url || s.images[0])) ||
-              ""
-          ),
-          alt: (s.alt && String(s.alt)) || "Slide image",
-          title: (s.title && String(s.title)) || "",
-          subtitle: (s.subtitle && String(s.subtitle)) || "",
-          align: (s.align && String(s.align).toLowerCase()) || "left",
-          overlay: Number(s.overlay ?? 40), // 0-100
-        }));
+// Normalize
+const normalizedSlides = published.map((s, i) => {
+  const imgFromArray = Array.isArray(s.images) ? (s.images[0]?.url ?? s.images[0]) : undefined;
 
-        if (mounted) setSlides(normalizedSlides);
-      } catch (e) {
-        console.error("Failed to fetch slides", e);
-      } finally {
-        if (mounted) setLoadingSlides(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  const rawSrc =
+    s.src ??
+    s.image ??
+    s.url ??
+    s.file?.url ??
+    imgFromArray ??
+    "";
 
-  /* -------- Fetch recent events (published) -------- */
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      setEventsLoading(true);
-      setEventsError("");
-      try {
-        const res = await fetch(`${API_BASE}/events/public?limit=6`, { cache: "no-store" });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const raw = await res.json();
-        const list = Array.isArray(raw) ? raw : raw.items || raw.events || [];
+  return {
+    id: s._id || s.id || i,
+    src: toMediaUrl(rawSrc),
+    alt: (s.alt && String(s.alt)) || "Slide image",
+    title: (s.title && String(s.title)) || "",
+    subtitle: (s.subtitle && String(s.subtitle)) || "",
+    align: (s.align && String(s.align).toLowerCase()) || "left",
+    overlay: Number(s.overlay ?? 40),
+  };
+});
 
-        const norm = list.map((e, i) => {
-          const id = e._id || e.id || i;
-          const title = String(e.title || e.name || "Untitled");
-          const cover = toMediaUrl(
-            e.coverImage ||
-              e.cover?.url ||
-              e.image ||
-              (Array.isArray(e.images) && (e.images[0]?.url || e.images[0])) ||
-              ""
-          );
-          const category = (e.category && (e.category.name || e.category)) || "Event";
-          const location = e.location || e.city || "";
-          const when = e.date || e.publishedAt || e.createdAt || null;
-          const desc = truncate(stripTags(e.description || e.excerpt || ""), 160);
 
-          return {
-            id,
-            title,
-            cover,
-            category,
-            location,
-            whenLabel: fmtDate(when),
-            desc,
-          };
-        });
+      if (mounted) setSlides(normalizedSlides);
+    } catch (e) {
+      console.error("Failed to fetch slides", e);
+    } finally {
+      if (mounted) setLoadingSlides(false);
+    }
+  })();
+  return () => {
+    mounted = false;
+  };
+}, []);
 
-        if (mounted) setEvents(norm);
-      } catch (err) {
-        console.error("Failed to fetch events", err);
-        if (mounted) setEventsError("Could not load events right now.");
-      } finally {
-        if (mounted) setEventsLoading(false);
-      }
-    })();
 
-    return () => {
-      mounted = false;
-    };
-  }, []);
+/* -------- Fetch recent events (published) -------- */
+useEffect(() => {
+  let mounted = true;
+
+  // Local helper: normalize anything into a valid /uploads/images/... URL on your API origin
+  const toEventImageUrl = (u) => {
+    if (!u) return "";
+    let s = String(u).trim();
+
+    // already a full URL or data/blob -> return
+    if (/^(https?:|data:|blob:)/i.test(s)) return s;
+
+    // fix backslashes
+    s = s.replace(/\\/g, "/");
+
+    // common stored shapes we’ve seen ⇒ convert to /uploads/images/...
+    // 1) '/uploads/images/foo.jpg' (good)  -> keep, just pin to API_ORIGIN
+    if (s.startsWith("/uploads/images/")) return `${API_ORIGIN}${s}`;
+
+    // 2) 'uploads/images/foo.jpg'         -> add leading slash + pin
+    if (s.startsWith("uploads/images/")) return `${API_ORIGIN}/${s}`;
+
+    // 3) '/images/foo.jpg'                -> prefix '/uploads'
+    if (s.startsWith("/images/")) return `${API_ORIGIN}/uploads${s}`;
+
+    // 4) 'images/foo.jpg'                 -> prefix '/uploads/'
+    if (s.startsWith("images/")) return `${API_ORIGIN}/uploads/${s}`;
+
+    // 5) bare filename 'foo.jpg' or 'foo.png' -> assume /uploads/images/<file>
+    if (!s.includes("/")) return `${API_ORIGIN}/uploads/images/${s}`;
+
+    // 6) other relative like '/api/uploads/images/foo.jpg' -> strip '/api' before '/uploads'
+    if (/\/api\/uploads\//.test(s)) s = s.replace("/api/uploads/", "/uploads/");
+
+    // final absolute (make sure it starts with '/')
+    if (!s.startsWith("/")) s = `/${s}`;
+    return `${API_ORIGIN}${s}`;
+  };
+
+  (async () => {
+    setEventsLoading(true);
+    setEventsError("");
+    try {
+      const res = await fetch(`${API_BASE}/events/public?limit=6`, { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const raw = await res.json();
+      const list = Array.isArray(raw) ? raw : raw.items || raw.events || [];
+
+      const norm = list.map((e, i) => {
+        const id = e._id || e.id || i;
+        const title = String(e.title || e.name || "Untitled");
+      
+        const imgFromArray = Array.isArray(e.images) ? (e.images[0]?.url ?? e.images[0]) : undefined;
+      
+        const rawCover =
+          e.coverImage ??
+          e.cover?.url ??
+          e.cover ??          // sometimes just a string
+          e.image ??
+          imgFromArray ??
+          e.filename ??
+          e.file?.url ??
+          e.path ??
+          "";
+      
+        const cover = toMediaUrl(rawCover);
+      
+        const category = (e.category && (e.category.name || e.category)) || "Event";
+        const location = e.location || e.city || "";
+        const when = e.date || e.publishedAt || e.createdAt || null;
+        const desc = truncate(stripTags(e.description || e.excerpt || ""), 160);
+      
+        return {
+          id,
+          title,
+          cover,
+          category,
+          location,
+          whenLabel: fmtDate(when),
+          desc,
+        };
+      });
+      
+
+      if (mounted) setEvents(norm);
+    } catch (err) {
+      console.error("Failed to fetch events", err);
+      if (mounted) setEventsError("Could not load events right now.");
+    } finally {
+      if (mounted) setEventsLoading(false);
+    }
+  })();
+
+  return () => {
+    mounted = false;
+  };
+}, []);
+
 
   /* -------- UI helpers -------- */
   const showHeroText = !loadingSlides && slides.length > 0;
