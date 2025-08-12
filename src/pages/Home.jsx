@@ -15,8 +15,8 @@ const isLocalHost = ["localhost", "127.0.0.1"].includes(window.location.hostname
 const API_BASE = (() => {
   const fromEnv = import.meta.env.VITE_API_URL;
   if (fromEnv) return strip(fromEnv);
-  if (isLocalHost) return strip(import.meta.env.VITE_API_LOCAL || "http://localhost:5000/api").replace(/\/$/, "");
-  return strip(import.meta.env.VITE_API_DEPLOY || "https://charity-backend-30xl.onrender.com/api").replace(/\/$/, "");
+  if (isLocalHost) return strip(import.meta.env.VITE_API_LOCAL || "http://localhost:5000/api");
+  return strip(import.meta.env.VITE_API_DEPLOY || "https://charity-backend-30xl.onrender.com/api");
 })();
 
 // Put this just below API_BASE
