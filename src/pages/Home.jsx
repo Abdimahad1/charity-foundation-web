@@ -1,54 +1,74 @@
 // src/pages/Home.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import "../styles/Home.css";
-import axios from "axios"; // kept in case other code relies on it
 import { Link } from "react-router-dom";
 
-/* ==================== API BASE ==================== */
+/* --------------------------------------------
+   API base selection (never localhost in prod)
+---------------------------------------------*/
 const strip = (s) => (s || "").replace(/\/+$/, "");
 const isLocalHost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
 
-/**
- * Priority:
- * - If app runs on localhost => use VITE_API_URL (local) or default to http://localhost:5000/api
- * - Else => use VITE_API_DEPLOY (prod) or default to your Render URL
- * - Guard: never allow localhost when the bundle is built for production
- */
 const API_BASE = (() => {
-  const localEnv = strip(import.meta.env.VITE_API_URL || "http://localhost:5000/api");
-  const deployEnv = strip(
-    import.meta.env.VITE_API_DEPLOY || "https://charity-backend-30xl.onrender.com/api"
-  );
+  const fromEnv = import.meta.env.VITE_API_URL;                  // e.g. http://localhost:5000/api (local)
+  const deployEnv = import.meta.env.VITE_API_DEPLOY;             // e.g. https://charity-backend-30xl.onrender.com/api
 
-  let base = isLocalHost ? localEnv : deployEnv;
+  const local = strip(fromEnv || "http://localhost:5000/api");
+  const deploy = strip(deployEnv || "https://charity-backend-30xl.onrender.com/api");
 
-  // Extra safety: if a prod build somehow carries localhost, fall back to deploy
-  if (import.meta.env.PROD && /^https?:\/\/(localhost|127\.0\.0\.1)/i.test(base)) {
-    base = deployEnv;
-  }
-  return base;
+  // If we're building/running prod, never use localhost base; else auto pick by hostname
+  if (import.meta.env.PROD) return deploy;
+  return isLocalHost ? local : deploy;
 })();
 
-/**
- * For media like /uploads/abc.jpg we need the server **origin** (no /api).
- * Example: API_BASE = https://host.com/api  -> API_ORIGIN = https://host.com
- */
-const API_ORIGIN = API_BASE.replace(/\/api(?:\/.*)?$/, "");
+// Origin host (no /api) → used for static image URLs
+const API_ORIGIN = API_BASE.replace(/\/api(?:\/.*)?$/, ""); // e.g. https://charity-backend-30xl.onrender.com
 
-/**
- * Normalize media URLs coming from the API. Accepts:
- * - absolute URLs (returned as-is)
- * - data: / blob: (returned as-is)
- * - /uploads/... or uploads/...
- * - sometimes backends accidentally return /api/uploads/..., strip the /api
- */
+/* --------------------------------------------
+   URL helpers
+---------------------------------------------*/
+// Generic absolute URL builder against API_BASE (for JSON endpoints)
+const toAbs = (u) => {
+  if (!u) return "";
+  return /^https?:\/\//i.test(u) ? u : `${API_BASE}${u.startsWith("/") ? u : `/${u}`}`;
+};
+
+// Robust media URL normalizer for images coming from DB
 const toMediaUrl = (u) => {
   if (!u) return "";
-  if (/^(https?:)?\/\//i.test(u) || /^data:|^blob:/i.test(u)) return u;
-  let path = u.startsWith("/") ? u : `/${u}`;
-  // If backend accidentally prepended /api before /uploads, drop that piece
-  path = path.replace(/\/api(?=\/uploads\/)/, "");
-  return `${API_ORIGIN}${path}`;
+  // keep data/blob as-is
+  if (/^(data:|blob:)/i.test(u)) return u;
+
+  // normalize slashes & trim
+  let s = String(u).trim().replace(/\\/g, "/");
+
+  // If some records accidentally saved 'api/uploads/..' ensure it starts with a slash for URL()
+  if (!/^https?:\/\//i.test(s) && !s.startsWith("/")) s = `/${s}`;
+
+  let url;
+  try {
+    // Build with API_ORIGIN as base so we can easily compare/override origin
+    url = new URL(s, API_ORIGIN);
+  } catch {
+    return "";
+  }
+
+  // Clean '/api' before '/uploads'
+  const cleanPath = url.pathname.replace(/\/api(?=\/uploads\/)/, "");
+  const qs = url.search || "";
+
+  // If path is under /uploads, ALWAYS serve from our API_ORIGIN to avoid mixed content & wrong hosts
+  if (/\/uploads\//.test(cleanPath)) {
+    return `${API_ORIGIN}${cleanPath}${qs}`;
+  }
+
+  // If we somehow got a root path from another origin, still prefer our API_ORIGIN
+  if (url.origin !== API_ORIGIN && cleanPath.startsWith("/")) {
+    return `${API_ORIGIN}${cleanPath}${qs}`;
+  }
+
+  // Otherwise, return normalized absolute URL
+  return `${url.origin}${cleanPath}${qs}`;
 };
 
 /* ==================== Icons (inline SVG) ==================== */
