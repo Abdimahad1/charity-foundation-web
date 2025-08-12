@@ -161,23 +161,13 @@ export default function Home() {
     (async () => {
       try {
         const url = `${API_BASE}/slides`;
-        const res = await fetch(url);
+        const res = await fetch(url, { cache: "no-store", headers: { "Cache-Control": "no-cache" } });
         const raw = await res.json();
 
         const arr = Array.isArray(raw) ? raw : (raw.items || raw.slides || []);
         const published = arr
           .filter((s) => s?.published === true)
-          .sort((a, b) => (a.position || 0) - (b.position || 0))
-          .slice(0, 3)
-          .map((s, i) => ({
-            id: s._id || s.id || i,
-            src: s.src,
-            alt: (s.alt && String(s.alt)) || 'Slide image',
-            title: (s.title && String(s.title)) || '',
-            subtitle: (s.subtitle && String(s.subtitle)) || '',
-            align: (s.align && String(s.align).toLowerCase()) || 'left',
-            overlay: Number(s.overlay ?? 40) // 0-100
-          }));
+          .sort((a, b) => (a.position || 0) - (b.position || 0));
 
         if (mounted) setSlides(published);
       } catch (e) {
@@ -198,7 +188,7 @@ export default function Home() {
       setEventsError("");
       try {
         // Public feed for homepage
-        const res = await fetch(`${API_BASE}/events/public?limit=6`);
+        const res = await fetch(`${API_BASE}/events/public?limit=6`, { cache: "no-store", headers: { "Cache-Control": "no-cache" } });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const raw = await res.json();
         const list = Array.isArray(raw) ? raw : (raw.items || raw.events || []);
@@ -241,6 +231,15 @@ export default function Home() {
 
     return () => { mounted = false; };
   }, []);
+
+  // Quick diagnostics while testing
+  if (process.env.NODE_ENV !== "production") {
+    return (
+      <div style={{ position: 'fixed', bottom: 8, left: 8, background: '#000a', color: '#fff', padding: '6px 8px', borderRadius: 6, fontSize: 12, zIndex: 9999 }}>
+        API: {API_BASE} • slides: {slides.length} • events: {events.length}
+      </div>
+    );
+  }
 
   // ✅ Compute before effects that use them
   const showHeroText = !loadingSlides && slides.length > 0;
