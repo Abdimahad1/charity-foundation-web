@@ -20,17 +20,20 @@ const API_BASE = (() => {
 })();
 
 // Put this just below API_BASE
-// Make absolute URLs for media coming from the API.
-// We strip a trailing '/api' because files usually live at the server origin.
-const API_ORIGIN = API_BASE.replace(/\/+$/, "");
-const FILE_ORIGIN = API_ORIGIN.replace(/\/api(?:\/v\d+)?$/, "");
+const API_ORIGIN = API_BASE.replace(/\/api(?:\/.*)?$/, ""); // e.g. https://charity-backend-30xl.onrender.com
 
+// Helper to turn /uploads/... into absolute URLs against API_BASE
+const toAbs = (u) => {
+  if (!u) return "";
+  return /^https?:\/\//i.test(u) ? u : `${API_BASE}${u.startsWith("/") ? u : `/${u}`}`;
+};
+
+// Replace your old toAbs with this:
 const toMediaUrl = (u) => {
   if (!u) return "";
-  // already absolute or data/blob
-  if (/^(https?:)?\/\//i.test(u) || /^data:/.test(u) || /^blob:/.test(u)) return u;
-  // relative like '/uploads/x.jpg' or 'uploads/x.jpg'
-  return `${FILE_ORIGIN}${u.startsWith("/") ? u : `/${u}`}`;
+  if (/^https?:\/\//i.test(u)) return u;
+  const path = u.startsWith("/") ? u : `/${u}`;
+  return `${API_ORIGIN}${path}`; // /uploads/... -> https://host/uploads/...
 };
 
 /* -------- Icons (inline SVG, no external libs) -------- */
@@ -164,101 +167,88 @@ export default function Home() {
   };
 
   // Fetch slides from backend (published only, sorted)
-// Fetch slides from backend (published only, sorted)
-useEffect(() => {
-  let mounted = true;
-  (async () => {
-    try {
-      const url = `${API_BASE}/slides`;
-      // no custom headers → avoids CORS preflight issues
-      const res = await fetch(url, { cache: "no-store" });
-      const raw = await res.json();
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const url = `${API_BASE}/slides`;
+        const res = await fetch(url, { cache: "no-store", headers: { "Cache-Control": "no-cache" } });
+        const raw = await res.json();
+        const arr = Array.isArray(raw) ? raw : (raw.items || raw.slides || []);
+        const published = arr
+          .filter(s => s?.published === true)
+          .sort((a, b) => (a.position || 0) - (b.position || 0));
 
-      const arr = Array.isArray(raw) ? raw : (raw.items || raw.slides || []);
-      const published = arr
-        .filter(s => s?.published === true)
-        .sort((a, b) => (a.position || 0) - (b.position || 0))
-        .slice(0, 3); // optional: keep top 3 for the hero
+        // Update src to use toMediaUrl
+        const normalizedSlides = published.map((s, i) => ({
+          id: s._id || s.id || i,
+          src: toMediaUrl(s.src || s.image || s.url || ""), // Updated line
+          alt: (s.alt && String(s.alt)) || "Slide image",
+          title: (s.title && String(s.title)) || "",
+          subtitle: (s.subtitle && String(s.subtitle)) || "",
+          align: (s.align && String(s.align).toLowerCase()) || "left",
+          overlay: Number(s.overlay ?? 40)
+        }));
 
-      const normalizedSlides = published.map((s, i) => ({
-        id: s._id || s.id || i,
-        src: toMediaUrl(
-          s.src ||
-          s.image ||
-          s.url ||
-          (s.cover && s.cover.url) ||
-          (Array.isArray(s.images) && (s.images[0]?.url || s.images[0])) ||
-          ""
-        ),
-        alt: (s.alt && String(s.alt)) || "Slide image",
-        title: (s.title && String(s.title)) || "",
-        subtitle: (s.subtitle && String(s.subtitle)) || "",
-        align: (s.align && String(s.align).toLowerCase()) || "left",
-        overlay: Number(s.overlay ?? 40),
-      }));
-
-      if (mounted) setSlides(normalizedSlides);
-    } catch (e) {
-      console.error("Failed to fetch slides", e);
-    } finally {
-      if (mounted) setLoadingSlides(false);
-    }
-  })();
-  return () => { mounted = false; };
-}, []);
-
+        if (mounted) setSlides(normalizedSlides);
+      } catch (e) {
+        console.error('Failed to fetch slides', e);
+      } finally {
+        if (mounted) setLoadingSlides(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   // Fetch recent events (published)
-// Fetch recent events (published)
-useEffect(() => {
-  let mounted = true;
-  (async () => {
-    setEventsLoading(true);
-    setEventsError("");
-    try {
-      const res = await fetch(`${API_BASE}/events/public?limit=6`, { cache: "no-store" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const raw = await res.json();
-      const list = Array.isArray(raw) ? raw : (raw.items || raw.events || []);
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      setEventsLoading(true);
+      setEventsError("");
+      try {
+        const res = await fetch(`${API_BASE}/events/public?limit=6`, { cache: "no-store", headers: { "Cache-Control": "no-cache" } }); // Updated line
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const raw = await res.json();
+        const list = Array.isArray(raw) ? raw : (raw.items || raw.events || []);
+        
+        // Update cover to use toMediaUrl
+        const norm = list.map((e, i) => {
+          const id = e._id || e.id || i;
+          const title = String(e.title || e.name || "Untitled");
+          const cover = toMediaUrl(
+            e.coverImage ||
+            e.cover?.url ||
+            e.image ||
+            (Array.isArray(e.images) && (e.images[0]?.url || e.images[0])) ||
+            ""
+          );
+          const category = (e.category && (e.category.name || e.category)) || "Event";
+          const location = e.location || e.city || "";
+          const when = e.date || e.publishedAt || e.createdAt || null;
+          const desc = truncate(stripTags(e.description || e.excerpt || ""), 160);
 
-      const norm = list.map((e, i) => {
-        const id = e._id || e.id || i;
-        const title = String(e.title || e.name || "Untitled");
-        const cover = toMediaUrl(
-          e.coverImage ||
-          e.cover?.url ||
-          e.image ||
-          (Array.isArray(e.images) && (e.images[0]?.url || e.images[0])) ||
-          ""
-        );
-        const category = (e.category && (e.category.name || e.category)) || "Event";
-        const location = e.location || e.city || "";
-        const when = e.date || e.publishedAt || e.createdAt || null;
-        const desc = truncate(stripTags(e.description || e.excerpt || ""), 160);
+          return {
+            id,
+            title,
+            cover, // Updated line
+            category,
+            location,
+            whenLabel: fmtDate(when),
+            desc,
+          };
+        });
 
-        return {
-          id,
-          title,
-          cover,
-          category,
-          location,
-          whenLabel: fmtDate(when),
-          desc,
-        };
-      });
-
-      if (mounted) setEvents(norm);
-    } catch (err) {
-      console.error("Failed to fetch events", err);
-      if (mounted) setEventsError("Could not load events right now.");
-    } finally {
-      if (mounted) setEventsLoading(false);
-    }
-  })();
-
-  return () => { mounted = false; };
-}, []);
-
+        if (mounted) setEvents(norm);
+      } catch (err) {
+        console.error("Failed to fetch events", err);
+        if (mounted) setEventsError("Could not load events right now.");
+      } finally {
+        if (mounted) setEventsLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   // Quick diagnostics while testing
   if (process.env.NODE_ENV !== "production") {
