@@ -2,99 +2,80 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "../styles/Home.css";
 import { Link } from "react-router-dom";
+import axios from "axios"; // ⬅ added this
 
-/* --------------------------------------------
-   API base selection (never localhost in prod)
----------------------------------------------*/
-const strip = (s) => (s || "").replace(/\/+$/, "");
+/* ---------- Base URLs like your admin page ---------- */
 const isLocalHost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
 
-const API_BASE = (() => {
-  const fromEnv = import.meta.env.VITE_API_URL;                  // e.g. http://localhost:5000/api (local)
-  const deployEnv = import.meta.env.VITE_API_DEPLOY;             // e.g. https://charity-backend-30xl.onrender.com/api
+const LOCAL_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000/api").replace(/\/$/, "");
+const DEPLOY_BASE = (import.meta.env.VITE_API_DEPLOY || "https://charity-backend-30xl.onrender.com/api").replace(/\/$/, "");
 
-  const local = strip(fromEnv || "http://localhost:5000/api");
-  const deploy = strip(deployEnv || "https://charity-backend-30xl.onrender.com/api");
+/* Never use localhost in production */
+const API_BASE = import.meta.env.PROD ? DEPLOY_BASE : (isLocalHost ? LOCAL_BASE : DEPLOY_BASE);
 
-  // If we're building/running prod, never use localhost base; else auto pick by hostname
-  if (import.meta.env.PROD) return deploy;
-  return isLocalHost ? local : deploy;
-})();
+/* For static files (strip /api) */
+const API_ORIGIN = API_BASE.replace(/\/api(?:\/.*)?$/, "");
 
-// Origin host (no /api) → used for static image URLs
-const API_ORIGIN = API_BASE.replace(/\/api(?:\/.*)?$/, ""); // e.g. https://charity-backend-30xl.onrender.com
+/* Axios instance (same idea as admin page) */
+const API = axios.create({ baseURL: API_BASE });
 
-/* --------------------------------------------
-   URL helpers
----------------------------------------------*/
-// Generic absolute URL builder against API_BASE (for JSON endpoints)
-const toAbs = (u) => {
+/* --- Minimal, robust absolutizer for legacy/relative paths --- */
+const absolutizeUploadUrl = (u) => {
   if (!u) return "";
-  return /^https?:\/\//i.test(u) ? u : `${API_BASE}${u.startsWith("/") ? u : `/${u}`}`;
+  let s = String(u).trim().replace(/\\/g, "/");
+
+  // already absolute or data/blob
+  if (/^(https?:|data:|blob:)/i.test(s)) return s;
+
+  // ensure leading slash for relative
+  if (!s.startsWith("/")) s = `/${s}`;
+
+  // remove accidental /api before /uploads
+  s = s.replace(/^\/api(?=\/uploads\/)/i, "");
+
+  // /images/foo.jpg  -> /uploads/images/foo.jpg
+  if (/^\/images\//i.test(s)) s = `/uploads${s}`;
+
+  // /foo.jpg -> /uploads/images/foo.jpg
+  if (/^\/[^/]+\.(jpg|jpeg|png|gif|webp)$/i.test(s)) s = `/uploads/images/${s}`;
+
+  // final absolute against API origin
+  return `${API_ORIGIN}${s}`;
 };
 
-// Robust media URL normalizer for images coming from DB
-// Build a correct absolute URL for any slide/event image the DB throws at us.
-// It normalizes: plain filenames, "images/..", "/images/..", "/api/uploads/..",
-// "/uploads/images/..", and even full http://localhost:5000/uploads/... .
-const toMediaUrl = (input) => {
-  if (!input) return "";
-  // handle objects like { url: "..."} defensively
-  let u =
-    typeof input === "string"
-      ? input
-      : input?.url || input?.src || input?.path || "";
+/* Match the admin “selector” behavior */
+const pickSlideSrc = (s) => {
+  const img0 = Array.isArray(s?.images) ? s.images[0] : undefined;
+  const img0Url = (typeof img0 === "object" && img0 !== null)
+    ? (img0?.url ?? img0?.src ?? img0?.path)
+    : img0;
 
-  if (!u) return "";
-  if (/^(data:|blob:)/i.test(u)) return u; // keep data/blob as-is
+  const candidate =
+    s?.src ??
+    s?.image ??
+    s?.url ??
+    s?.file?.url ??
+    img0Url ??
+    (s?.filename ? `/uploads/images/${s.filename}` : "");
 
-  // normalize slashes & trim
-  u = String(u).trim().replace(/\\/g, "/");
-
-  // If it's a bare filename like "file.jpg", make it /uploads/images/file.jpg
-  if (!/^https?:\/\//i.test(u) && !u.includes("/")) {
-    u = `/uploads/images/${u}`;
-  }
-
-  // Ensure it starts with a slash if it's not absolute
-  if (!/^https?:\/\//i.test(u) && !u.startsWith("/")) {
-    u = `/${u}`;
-  }
-
-  // Parse relative/absolute into a URL so we can easily extract the path
-  let parsed;
-  try {
-    parsed = new URL(u, API_ORIGIN);
-  } catch {
-    return "";
-  }
-
-  // Start from the path we got
-  let p = parsed.pathname;
-
-  // Common fixes:
-  // 1) /api/uploads/...  -> /uploads/...
-  p = p.replace(/^\/api\/uploads\//i, "/uploads/");
-
-  // 2) images/... or /images/... -> /uploads/images/...
-  if (/^\/?images\//i.test(p)) {
-    p = p.replace(/^\/?images\//i, "/uploads/images/");
-  }
-
-  // 3) cv/... or /cv/... -> /uploads/cv/...
-  if (/^\/?cv\//i.test(p)) {
-    p = p.replace(/^\/?cv\//i, "/uploads/cv/");
-  }
-
-  // 4) If it's still not under /uploads/, assume it's meant to be an image
-  if (!/^\/uploads\//i.test(p)) {
-    p = `/uploads/images/${p.replace(/^\/+/, "")}`;
-  }
-
-  // Always serve uploads from our API_ORIGIN (prevents localhost/mixed-origin issues)
-  return `${API_ORIGIN}${p}${parsed.search || ""}`;
+  return absolutizeUploadUrl(candidate);
 };
 
+const pickEventCover = (e) => {
+  const img0 = Array.isArray(e?.images) ? e.images[0] : undefined;
+  const img0Url = (typeof img0 === "object" && img0 !== null)
+    ? (img0?.url ?? img0?.src ?? img0?.path)
+    : img0;
+
+  const candidate =
+    e?.coverImage ??
+    e?.cover?.url ??
+    e?.image ??
+    img0Url ??
+    (e?.filename ? `/uploads/images/${e.filename}` : "");
+
+  return absolutizeUploadUrl(candidate);
+};
 
 /* ==================== Icons (inline SVG) ==================== */
 const IconEducation = () => (
@@ -229,43 +210,34 @@ useEffect(() => {
   let mounted = true;
   (async () => {
     try {
-      const res = await fetch(`${API_BASE}/slides`, { cache: "no-store" }); // no custom headers => no preflight
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const raw = await res.json();
+      const { data } = await API.get("/slides", { params: {} }); // no custom headers => no preflight
+      const raw =
+        Array.isArray(data) ? data :
+        (Array.isArray(data?.items) ? data.items :
+        (Array.isArray(data?.slides) ? data.slides : []));
 
-      const arr = Array.isArray(raw) ? raw : raw.items || raw.slides || [];
-      const published = arr
+      const published = raw
         .filter((s) => s?.published === true)
-        .sort((a, b) => (a.position || 0) - (b.position || 0))
+        .sort((a, b) => (a?.position ?? 0) - (b?.position ?? 0))
         .slice(0, 3);
 
-// Normalize
-const normalizedSlides = published.map((s, i) => {
-  const imgFromArray = Array.isArray(s.images) ? (s.images[0]?.url ?? s.images[0]) : undefined;
+      const normalizedSlides = published.map((s, i) => ({
+        id: s?._id || s?.id || i,
+        src: pickSlideSrc(s),
+        alt: (s?.alt && String(s.alt)) || "Slide image",
+        title: (s?.title && String(s.title)) || "",
+        subtitle: (s?.subtitle && String(s.subtitle)) || "",
+        align: (s?.align && String(s.align).toLowerCase()) || "left",
+        overlay: Number(s?.overlay ?? 40),
+      }));
 
-  const rawSrc =
-    s.src ??
-    s.image ??
-    s.url ??
-    s.file?.url ??
-    imgFromArray ??
-    "";
-
-  return {
-    id: s._id || s.id || i,
-    src: toMediaUrl(rawSrc),
-    alt: (s.alt && String(s.alt)) || "Slide image",
-    title: (s.title && String(s.title)) || "",
-    subtitle: (s.subtitle && String(s.subtitle)) || "",
-    align: (s.align && String(s.align).toLowerCase()) || "left",
-    overlay: Number(s.overlay ?? 40),
-  };
-});
-
+      if (import.meta.env.DEV) {
+        console.debug("Slides normalized:", normalizedSlides.map(x => x.src));
+      }
 
       if (mounted) setSlides(normalizedSlides);
-    } catch (e) {
-      console.error("Failed to fetch slides", e);
+    } catch (err) {
+      console.error("Failed to fetch slides", err);
     } finally {
       if (mounted) setLoadingSlides(false);
     }
@@ -280,73 +252,26 @@ const normalizedSlides = published.map((s, i) => {
 useEffect(() => {
   let mounted = true;
 
-  // Local helper: normalize anything into a valid /uploads/images/... URL on your API origin
-  const toEventImageUrl = (u) => {
-    if (!u) return "";
-    let s = String(u).trim();
-
-    // already a full URL or data/blob -> return
-    if (/^(https?:|data:|blob:)/i.test(s)) return s;
-
-    // fix backslashes
-    s = s.replace(/\\/g, "/");
-
-    // common stored shapes we’ve seen ⇒ convert to /uploads/images/...
-    // 1) '/uploads/images/foo.jpg' (good)  -> keep, just pin to API_ORIGIN
-    if (s.startsWith("/uploads/images/")) return `${API_ORIGIN}${s}`;
-
-    // 2) 'uploads/images/foo.jpg'         -> add leading slash + pin
-    if (s.startsWith("uploads/images/")) return `${API_ORIGIN}/${s}`;
-
-    // 3) '/images/foo.jpg'                -> prefix '/uploads'
-    if (s.startsWith("/images/")) return `${API_ORIGIN}/uploads${s}`;
-
-    // 4) 'images/foo.jpg'                 -> prefix '/uploads/'
-    if (s.startsWith("images/")) return `${API_ORIGIN}/uploads/${s}`;
-
-    // 5) bare filename 'foo.jpg' or 'foo.png' -> assume /uploads/images/<file>
-    if (!s.includes("/")) return `${API_ORIGIN}/uploads/images/${s}`;
-
-    // 6) other relative like '/api/uploads/images/foo.jpg' -> strip '/api' before '/uploads'
-    if (/\/api\/uploads\//.test(s)) s = s.replace("/api/uploads/", "/uploads/");
-
-    // final absolute (make sure it starts with '/')
-    if (!s.startsWith("/")) s = `/${s}`;
-    return `${API_ORIGIN}${s}`;
-  };
-
   (async () => {
     setEventsLoading(true);
     setEventsError("");
     try {
-      const res = await fetch(`${API_BASE}/events/public?limit=6`, { cache: "no-store" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const raw = await res.json();
-      const list = Array.isArray(raw) ? raw : raw.items || raw.events || [];
+      const { data } = await API.get("/events/public", { params: { limit: 6 } });
+      const list =
+        Array.isArray(data) ? data :
+        (Array.isArray(data?.items) ? data.items :
+        (Array.isArray(data?.events) ? data.events : []));
 
       const norm = list.map((e, i) => {
-        const id = e._id || e.id || i;
-        const title = String(e.title || e.name || "Untitled");
+        const id = e?._id || e?.id || i;
+        const title = String(e?.title || e?.name || "Untitled");
       
-        const imgFromArray = Array.isArray(e.images) ? (e.images[0]?.url ?? e.images[0]) : undefined;
+        const cover = pickEventCover(e);
       
-        const rawCover =
-          e.coverImage ??
-          e.cover?.url ??
-          e.cover ??          // sometimes just a string
-          e.image ??
-          imgFromArray ??
-          e.filename ??
-          e.file?.url ??
-          e.path ??
-          "";
-      
-        const cover = toMediaUrl(rawCover);
-      
-        const category = (e.category && (e.category.name || e.category)) || "Event";
-        const location = e.location || e.city || "";
-        const when = e.date || e.publishedAt || e.createdAt || null;
-        const desc = truncate(stripTags(e.description || e.excerpt || ""), 160);
+        const category = (e?.category && (e.category.name || e.category)) || "Event";
+        const location = e?.location || e?.city || "";
+        const when = e?.date || e?.publishedAt || e?.createdAt || null;
+        const desc = truncate(stripTags(e?.description || e?.excerpt || ""), 160);
       
         return {
           id,
@@ -359,6 +284,9 @@ useEffect(() => {
         };
       });
       
+      if (import.meta.env.DEV) {
+        console.debug("Events covers:", norm.map(x => x.cover));
+      }
 
       if (mounted) setEvents(norm);
     } catch (err) {
