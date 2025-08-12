@@ -1,6 +1,6 @@
 // src/pages/Home.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import "../../styles/Home.css";
+import "../styles/Home.css";
 import axios from "axios";
 
 // Helper functions for API base URL
