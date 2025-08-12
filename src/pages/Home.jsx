@@ -34,81 +34,67 @@ const toAbs = (u) => {
 };
 
 // Robust media URL normalizer for images coming from DB
-const toMediaUrl = (u) => {
-  if (!u) {
-    console.debug('[toMediaUrl] Empty input');
-    return "";
-  }
+// Build a correct absolute URL for any slide/event image the DB throws at us.
+// It normalizes: plain filenames, "images/..", "/images/..", "/api/uploads/..",
+// "/uploads/images/..", and even full http://localhost:5000/uploads/... .
+const toMediaUrl = (input) => {
+  if (!input) return "";
+  // handle objects like { url: "..."} defensively
+  let u =
+    typeof input === "string"
+      ? input
+      : input?.url || input?.src || input?.path || "";
 
-  // Debug original input
-  console.debug('[toMediaUrl] Original input:', u);
-
-  // keep data/blob as-is
-  if (/^(data:|blob:)/i.test(u)) {
-    console.debug('[toMediaUrl] Data/blob URL - returning as-is');
-    return u;
-  }
+  if (!u) return "";
+  if (/^(data:|blob:)/i.test(u)) return u; // keep data/blob as-is
 
   // normalize slashes & trim
-  let s = String(u).trim().replace(/\\/g, "/");
-  console.debug('[toMediaUrl] After normalization:', s);
+  u = String(u).trim().replace(/\\/g, "/");
 
-  // Handle common cases explicitly
-  if (/^https?:\/\//i.test(s)) {
-    console.debug('[toMediaUrl] Already absolute URL - returning as-is');
-    return s;
+  // If it's a bare filename like "file.jpg", make it /uploads/images/file.jpg
+  if (!/^https?:\/\//i.test(u) && !u.includes("/")) {
+    u = `/uploads/images/${u}`;
   }
 
-  // Special handling for common backend paths
-  if (s.startsWith('uploads/') || s.startsWith('/uploads/')) {
-    const result = `${API_ORIGIN}/${s.replace(/^\/+/, '')}`;
-    console.debug('[toMediaUrl] Uploads path - transformed to:', result);
-    return result;
+  // Ensure it starts with a slash if it's not absolute
+  if (!/^https?:\/\//i.test(u) && !u.startsWith("/")) {
+    u = `/${u}`;
   }
 
-  // Handle potential API path prefixes
-  if (s.startsWith('api/') || s.startsWith('/api/')) {
-    s = s.replace(/^\/?api\//, '');
-  }
-
-  let url;
+  // Parse relative/absolute into a URL so we can easily extract the path
+  let parsed;
   try {
-    console.debug('[toMediaUrl] Attempting to construct URL from:', s, 'with base:', API_ORIGIN);
-    url = new URL(s, API_ORIGIN);
-  } catch (err) {
-    console.error('[toMediaUrl] URL construction failed:', err);
+    parsed = new URL(u, API_ORIGIN);
+  } catch {
     return "";
   }
 
-  // Clean '/api' before '/uploads' if present
-  const cleanPath = url.pathname.replace(/\/api(?=\/uploads\/)/, "");
-  const qs = url.search || "";
+  // Start from the path we got
+  let p = parsed.pathname;
 
-  console.debug('[toMediaUrl] Constructed URL components:', {
-    origin: url.origin,
-    pathname: url.pathname,
-    cleanPath,
-    search: url.search
-  });
+  // Common fixes:
+  // 1) /api/uploads/...  -> /uploads/...
+  p = p.replace(/^\/api\/uploads\//i, "/uploads/");
 
-  // Special case for uploads - always serve from our origin
-  if (/\/uploads\//.test(cleanPath)) {
-    const result = `${API_ORIGIN}${cleanPath}${qs}`;
-    console.debug('[toMediaUrl] Uploads path detected - final URL:', result);
-    return result;
+  // 2) images/... or /images/... -> /uploads/images/...
+  if (/^\/?images\//i.test(p)) {
+    p = p.replace(/^\/?images\//i, "/uploads/images/");
   }
 
-  // If path is from another origin but is root-relative, use our origin
-  if (url.origin !== API_ORIGIN && cleanPath.startsWith("/")) {
-    const result = `${API_ORIGIN}${cleanPath}${qs}`;
-    console.debug('[toMediaUrl] Foreign origin with root path - final URL:', result);
-    return result;
+  // 3) cv/... or /cv/... -> /uploads/cv/...
+  if (/^\/?cv\//i.test(p)) {
+    p = p.replace(/^\/?cv\//i, "/uploads/cv/");
   }
 
-  const finalUrl = `${url.origin}${cleanPath}${qs}`;
-  console.debug('[toMediaUrl] Final URL:', finalUrl);
-  return finalUrl;
+  // 4) If it's still not under /uploads/, assume it's meant to be an image
+  if (!/^\/uploads\//i.test(p)) {
+    p = `/uploads/images/${p.replace(/^\/+/, "")}`;
+  }
+
+  // Always serve uploads from our API_ORIGIN (prevents localhost/mixed-origin issues)
+  return `${API_ORIGIN}${p}${parsed.search || ""}`;
 };
+
 
 /* ==================== Icons (inline SVG) ==================== */
 const IconEducation = () => (
