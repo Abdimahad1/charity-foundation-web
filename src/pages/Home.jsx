@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "../styles/Home.css";
 import axios from "axios";
+import { Link } from "react-router-dom";
 
 // Helper functions for API base URL
 const strip = (s) => (s || "").replace(/\/+$/, "");
