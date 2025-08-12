@@ -19,16 +19,10 @@ const API_BASE = (() => {
   return strip(import.meta.env.VITE_API_DEPLOY || "https://charity-backend-30xl.onrender.com/api");
 })();
 
-// Put this just below API_BASE
-const API_ORIGIN = API_BASE.replace(/\/api(?:\/.*)?$/, ""); // e.g. https://charity-backend-30xl.onrender.com
+// Extract origin without /api for media URLs
+const API_ORIGIN = API_BASE.replace(/\/api(?:\/.*)?$/, "");
 
-// Helper to turn /uploads/... into absolute URLs against API_BASE
-const toAbs = (u) => {
-  if (!u) return "";
-  return /^https?:\/\//i.test(u) ? u : `${API_BASE}${u.startsWith("/") ? u : `/${u}`}`;
-};
-
-// Replace your old toAbs with this:
+// Helper to turn /uploads/... into absolute URLs against API_ORIGIN
 const toMediaUrl = (u) => {
   if (!u) return "";
   if (/^https?:\/\//i.test(u)) return u;
@@ -152,7 +146,7 @@ export default function Home() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
 
-  // NEW: Recent events
+  // Recent events
   const [events, setEvents] = useState([]);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [eventsError, setEventsError] = useState("");
@@ -182,7 +176,7 @@ export default function Home() {
         // Update src to use toMediaUrl
         const normalizedSlides = published.map((s, i) => ({
           id: s._id || s.id || i,
-          src: toMediaUrl(s.src || s.image || s.url || ""), // Updated line
+          src: toMediaUrl(s.src || s.image || s.url || ""),
           alt: (s.alt && String(s.alt)) || "Slide image",
           title: (s.title && String(s.title)) || "",
           subtitle: (s.subtitle && String(s.subtitle)) || "",
@@ -207,7 +201,7 @@ export default function Home() {
       setEventsLoading(true);
       setEventsError("");
       try {
-        const res = await fetch(`${API_BASE}/events/public?limit=6`, { cache: "no-store", headers: { "Cache-Control": "no-cache" } }); // Updated line
+        const res = await fetch(`${API_BASE}/events/public?limit=6`, { cache: "no-store", headers: { "Cache-Control": "no-cache" } });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const raw = await res.json();
         const list = Array.isArray(raw) ? raw : (raw.items || raw.events || []);
@@ -231,7 +225,7 @@ export default function Home() {
           return {
             id,
             title,
-            cover, // Updated line
+            cover,
             category,
             location,
             whenLabel: fmtDate(when),
@@ -259,7 +253,7 @@ export default function Home() {
     );
   }
 
-  // ✅ Compute before effects that use them
+  // Compute before effects that use them
   const showHeroText = !loadingSlides && slides.length > 0;
   const current = slides[currentSlide] || {};
 
@@ -432,7 +426,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ===== NEW: RECENT EVENTS (from API) ===== */}
+      {/* ===== RECENT EVENTS (from API) ===== */}
       <section className="section container-wide mission" aria-labelledby="mission-title">
         <div className="mission-head">
           <h2 id="mission-title" className="reveal">Recent Events</h2>
