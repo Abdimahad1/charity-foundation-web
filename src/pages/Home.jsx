@@ -22,36 +22,43 @@ const API = axios.create({ baseURL: API_BASE });
 /* --- Minimal, robust absolutizer for legacy/relative paths --- */
 const absolutizeUploadUrl = (u) => {
   if (!u) return "";
+
+  // Trim and normalize slashes
   let s = String(u).trim().replace(/\\/g, "/");
 
-  // already absolute or data/blob
-  if (/^(https?:|data:|blob:)/i.test(s)) return s;
+  // ✅ If DB already has a full URL, just use it
+  if (/^https?:\/\//i.test(s) || /^data:|^blob:/i.test(s)) return s;
 
-  // ensure leading slash for relative
+  // Ensure leading slash for relative forms
   if (!s.startsWith("/")) s = `/${s}`;
 
-  // remove accidental /api before /uploads
+  // Remove accidental "/api" segment before "/uploads"
   s = s.replace(/^\/api(?=\/uploads\/)/i, "");
 
-  // /images/foo.jpg  -> /uploads/images/foo.jpg
+  // Turn "/images/xyz.jpg" into "/uploads/images/xyz.jpg"
   if (/^\/images\//i.test(s)) s = `/uploads${s}`;
 
-  // /foo.jpg -> /uploads/images/foo.jpg
-  if (/^\/[^/]+\.(jpg|jpeg|png|gif|webp)$/i.test(s)) s = `/uploads/images/${s}`;
+  // Turn "/foo.jpg" into "/uploads/images/foo.jpg"
+  if (/^\/[^/]+\.(jpg|jpeg|png|gif|webp)$/i.test(s)) s = `/uploads/images${s}`;
 
-  // final absolute against API origin
+  // If it already starts with /uploads, keep it
+  if (/^\/uploads\//i.test(s)) return `${API_ORIGIN}${s}`;
+
+  // Fallback: treat as a root-relative path on the API origin
   return `${API_ORIGIN}${s}`;
 };
 
+
 /* Match the admin “selector” behavior */
 const pickSlideSrc = (s) => {
+  // 1) Prefer the DB 'src' if present (often already absolute)
+  if (s?.src) return absolutizeUploadUrl(s.src);
+
+  // 2) Otherwise probe other common fields then absolutize
   const img0 = Array.isArray(s?.images) ? s.images[0] : undefined;
-  const img0Url = (typeof img0 === "object" && img0 !== null)
-    ? (img0?.url ?? img0?.src ?? img0?.path)
-    : img0;
+  const img0Url = (img0 && typeof img0 === "object") ? (img0.url ?? img0.src ?? img0.path) : img0;
 
   const candidate =
-    s?.src ??
     s?.image ??
     s?.url ??
     s?.file?.url ??
@@ -60,15 +67,19 @@ const pickSlideSrc = (s) => {
 
   return absolutizeUploadUrl(candidate);
 };
+if (import.meta.env.DEV) {
+  console.debug("Slide URLs:", normalizedSlides.map(s => s.src));
+  console.debug("Event covers:", norm.map(e => e.cover));
+}
+
 
 const pickEventCover = (e) => {
+  if (e?.coverImage) return absolutizeUploadUrl(e.coverImage);
+
   const img0 = Array.isArray(e?.images) ? e.images[0] : undefined;
-  const img0Url = (typeof img0 === "object" && img0 !== null)
-    ? (img0?.url ?? img0?.src ?? img0?.path)
-    : img0;
+  const img0Url = (img0 && typeof img0 === "object") ? (img0.url ?? img0.src ?? img0.path) : img0;
 
   const candidate =
-    e?.coverImage ??
     e?.cover?.url ??
     e?.image ??
     img0Url ??
@@ -76,6 +87,7 @@ const pickEventCover = (e) => {
 
   return absolutizeUploadUrl(candidate);
 };
+
 
 /* ==================== Icons (inline SVG) ==================== */
 const IconEducation = () => (
