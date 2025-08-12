@@ -1,7 +1,28 @@
 // src/pages/Home.jsx
-import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import '../styles/Home.css';
+import React, { useEffect, useMemo, useState } from "react";
+import "../../styles/Home.css";
+import axios from "axios";
+
+// Helper functions for API base URL
+const strip = (s) => (s || "").replace(/\/+$/, "");
+const isLocalHost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+
+// Priority:
+// 1) VITE_API_URL (explicit override for this build)
+// 2) If on localhost -> local API (env or default)
+// 3) Else -> deployed API fallback
+const API_BASE = (() => {
+  const fromEnv = import.meta.env.VITE_API_URL;
+  if (fromEnv) return strip(fromEnv);
+  if (isLocalHost) return strip(import.meta.env.VITE_API_LOCAL || "http://localhost:5000/api");
+  return strip(import.meta.env.VITE_API_DEPLOY || "https://charity-backend-30xl.onrender.com/api");
+})();
+
+// Helper to turn /uploads/... into absolute URLs against API_BASE
+const toAbs = (u) => {
+  if (!u) return "";
+  return /^https?:\/\//i.test(u) ? u : `${API_BASE}${u.startsWith("/") ? u : `/${u}`}`;
+};
 
 /* -------- Icons (inline SVG, no external libs) -------- */
 const IconEducation = () => (
@@ -138,7 +159,7 @@ export default function Home() {
     let mounted = true;
     (async () => {
       try {
-        const url = `${import.meta.env.VITE_API_URL}/slides`;
+        const url = `${API_BASE}/slides`;
         const res = await fetch(url);
         const raw = await res.json();
 
@@ -171,19 +192,12 @@ export default function Home() {
   useEffect(() => {
     let mounted = true;
 
-    // make relative /uploads/... absolute, same idea as slides using a single URL
-    const base = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
-    const toAbs = (u) => {
-      if (!u) return "";
-      return /^https?:\/\//i.test(u) ? u : (base ? `${base}${u.startsWith("/") ? u : `/${u}`}` : u);
-    };
-
     (async () => {
       setEventsLoading(true);
       setEventsError("");
       try {
         // Public feed for homepage
-        const res = await fetch(`${base}/events/public?limit=6`);
+        const res = await fetch(`${API_BASE}/events/public?limit=6`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const raw = await res.json();
         const list = Array.isArray(raw) ? raw : (raw.items || raw.events || []);
