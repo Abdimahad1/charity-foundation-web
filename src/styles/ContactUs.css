@@ -1,0 +1,208 @@
+:root{
+  --container: 1100px;
+  --container-wide: 1380px; /* NEW: wider width for full-page fit */
+  --radius: 16px;
+  --radius-lg: 22px;
+
+  --brand: #0f6cff;
+  --brand-dark: #0b53c2;
+  --accent: #ffd700;
+
+  --text: #0b1220;
+  --muted: #5a6775;
+  --ghost: #eef3ff;
+  --bg: #ffffff;
+
+  --card: #fff;
+  --shadow: 0 10px 30px rgba(0,0,0,.08);
+
+  --outline: rgba(0,0,0,.06);
+}
+
+.contact{ background: var(--bg); color: var(--text); }
+.container{ width: min(100% - 2rem, var(--container)); margin-inline:auto; }
+.container-wide{ width: min(100% - 2rem, var(--container-wide)); margin-inline:auto; } /* NEW */
+.section{ padding: 2.4rem 0 3rem; }
+.icon{ width:20px; height:20px; fill: currentColor; }
+
+/* ---------- HERO ---------- */
+.c-hero{
+  position:relative;
+  padding: 3.2rem 0 1.4rem;
+  background:
+    radial-gradient(60% 60% at 50% 40%, rgba(15,108,255,.14), transparent 60%),
+    linear-gradient(180deg, #f5f8ff 0%, #ffffff 100%);
+  overflow:hidden;
+}
+.c-hero-inner{ position:relative; text-align:center; } /* width via .container-wide */
+.badge{
+  display:inline-block; padding:.35rem .75rem; border-radius:999px;
+  background: rgba(255,255,255,.75); backdrop-filter: blur(8px);
+  border:1px solid var(--outline); color: var(--brand-dark); font-weight:800;
+}
+.title{ font-size: clamp(2rem, 5vw, 3rem); margin:.6rem 0 .3rem; letter-spacing:-.02em; }
+.sub{ color: var(--muted); max-width: 980px; margin:0 auto 1rem; }
+.spark{ position:absolute; opacity:.9; font-size:26px; animation: float 6s ease-in-out infinite; }
+.spark.a{ top: 18%; left: 10%; }
+.spark.b{ bottom: 16%; right: 12%; }
+
+/* ---------- GRID ---------- */
+.c-grid{
+  display:grid;
+  gap: 1.25rem;
+  grid-template-columns: 2fr 1fr; /* fills wider page */
+  align-items: start;
+}
+
+/* ---------- FORM CARD ---------- */
+.card{
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  border:1px solid var(--outline);
+  box-shadow: var(--shadow);
+}
+.c-form{ padding: 1.35rem 1.5rem; }
+.form-title{
+  display:flex; align-items:center; gap:.5rem; margin:0 0 .9rem; letter-spacing:-.01em;
+}
+
+.grid-2{ display:grid; grid-template-columns: 1fr 1fr; gap:.9rem; }
+
+.form-row{ margin-bottom: 1rem; }
+.label{ display:block; font-weight:800; margin-bottom:.4rem; }
+input, textarea{
+  width:100%; border:1px solid var(--outline); border-radius: 12px; padding:.7rem .85rem; outline:none;
+  font: inherit; color: inherit; background:#fff; box-shadow: var(--shadow);
+}
+textarea{ resize: vertical; }
+
+/* focus ring */
+input:focus, textarea:focus{
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(15,108,255,.12), var(--shadow);
+}
+
+.submit-row{ display:flex; align-items:center; gap:.85rem; margin-top:.6rem; flex-wrap:wrap; }
+.status{ font-weight:800; }
+.status.ok{ color:#1b7f2a; }
+.status.err{ color:#b42121; }
+
+/* ---------- BUTTONS ---------- */
+.btn{
+  appearance:none; border:0; outline:0; border-radius:999px; padding:.85rem 1.25rem; font-weight:800; cursor:pointer;
+  text-decoration:none; display:inline-flex; align-items:center; gap:.5rem; box-shadow: var(--shadow);
+  transition: transform .12s ease, box-shadow .12s ease, background .12s ease, color .12s ease;
+}
+.btn:hover{ transform: translateY(-1px); box-shadow: 0 12px 32px rgba(0,0,0,.12); }
+.btn-primary{ background: var(--brand); color:#fff; }
+.btn-primary:hover{ background: var(--brand-dark); }
+.sheen{ position:relative; overflow:hidden; }
+.sheen::after{
+  content:""; position:absolute; inset:0; transform: translateX(-120%);
+  background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,.35) 45%, transparent 60%);
+  animation: sheen 2.8s linear infinite;
+}
+
+/* ---------- ASIDE ---------- */
+.c-aside{
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+  position: sticky;                  /* sticky on wide screens */
+  top: calc(var(--header-h, 76px) + 12px);
+}
+
+.info-cards{ display:grid; gap:.6rem; }
+.icard{
+  display:flex; gap:.6rem; align-items:flex-start;
+  background:#fff; border-radius: 14px; padding:.75rem .8rem;
+  border:1px solid var(--outline); box-shadow: var(--shadow);
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+}
+.icard:hover{ transform: translateY(-2px); box-shadow: 0 12px 32px rgba(0,0,0,.12); border-color: rgba(0,0,0,.1); }
+.icard h4{ margin:.05rem 0 .2rem; }
+.icard p{ margin:0; color: var(--muted); }
+.iicon{
+  width:40px; height:40px; border-radius:12px; display:grid; place-items:center; color:#0b1220;
+  background: rgba(15,108,255,.12);
+}
+.i1 .iicon{ background: rgba(138,201,38,.18); }
+.i2 .iicon{ background: rgba(15,108,255,.14); }
+.i3 .iicon{ background: rgba(255,183,3,.2); }
+.i4 .iicon{ background: rgba(255,107,107,.16); }
+
+/* Map */
+.map-card{
+  background:#fff; border-radius: 16px; border:1px solid var(--outline); box-shadow: var(--shadow);
+  overflow:hidden;
+}
+.map-title{
+  display:flex; align-items:center; gap:.45rem; font-weight:800; padding:.7rem .9rem;
+  border-bottom:1px solid var(--outline);
+}
+.map-embed{
+  position:relative; width:100%; padding-top: 62%; /* 16:10 ratio */
+  background:#f0f4ff;
+}
+.map-embed iframe{
+  position:absolute; inset:0; width:100%; height:100%; border:0; border-radius: 0;
+}
+.map-link{
+  display:block; text-align:center; font-weight:800; padding:.55rem .75rem; color:#243146;
+  background:#f7f9fc; border-top:1px solid var(--outline); text-decoration:none;
+}
+.map-link:hover{ background:#eef3ff; }
+
+/* ---------- REVEAL ---------- */
+.reveal{ opacity:0; transform: translateY(14px) scale(.98); transition: opacity .5s ease, transform .5s ease; }
+.reveal.in-view{ opacity:1; transform: translateY(0) scale(1); }
+
+/* ---------- FLOATS ---------- */
+@keyframes float{ 0%{transform: translateY(0);} 50%{transform: translateY(-10px);} 100%{transform: translateY(0);} }
+
+/* ---------- RESPONSIVE ---------- */
+@media (max-width: 1024px){
+  .c-grid{ grid-template-columns: 1fr; }
+  .c-aside{ position: static; top:auto; }
+}
+@media (max-width: 560px){
+  .grid-2{ grid-template-columns: 1fr; } /* stack pairs on small screens */
+}
+
+/* --- Address polish (no markup changes needed) --- */
+.address-lines {
+  font-style: normal;
+  line-height: 1.35;
+  color: #213043;
+  margin: .15rem 0 0;
+  white-space: normal;
+}
+
+.icard h4 {
+  font-weight: 800;
+  letter-spacing: .01em;
+}
+
+.icard .iicon .icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* Slightly stronger hover for the address card */
+.icard.i1:hover {
+  box-shadow: 0 14px 36px rgba(0,0,0,.14);
+}
+
+/* Map visual tweak */
+.map-embed iframe {
+  filter: saturate(1.05) contrast(1.02);
+}
+
+/* Make the sticky aside behave nicely on very short screens */
+@media (max-height: 680px) and (min-width: 1025px) {
+  .c-aside {
+    position: static;
+    top: auto;
+  }
+}
+
