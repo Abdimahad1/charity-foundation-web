@@ -13,11 +13,16 @@ const isLocalHost = ["localhost", "127.0.0.1"].includes(window.location.hostname
 // 2) If on localhost -> local API (env or default)
 // 3) Else -> deployed API fallback
 const API_BASE = (() => {
-  const fromEnv = import.meta.env.VITE_API_URL;
-  if (fromEnv) return strip(fromEnv);
-  if (isLocalHost) return strip(import.meta.env.VITE_API_LOCAL || "http://localhost:5000/api");
-  return strip(import.meta.env.VITE_API_DEPLOY || "https://charity-backend-30xl.onrender.com/api");
+  const strip = s => (s || "").replace(/\/+$/, "");
+  const fromEnv = import.meta.env.VITE_API_URL && strip(import.meta.env.VITE_API_URL);
+  const local = strip(import.meta.env.VITE_API_LOCAL || "http://localhost:5000/api");
+  const deploy = strip(import.meta.env.VITE_API_DEPLOY || "https://charity-backend-30xl.onrender.com/api");
+
+  let base = fromEnv || (["localhost","127.0.0.1"].includes(window.location.hostname) ? local : deploy);
+  if (import.meta.env.PROD && /^https?:\/\/(localhost|127\.0\.0\.1)/i.test(base)) base = deploy; // never localhost in prod
+  return base;
 })();
+
 
 // Helper to turn /uploads/... into absolute URLs against API_BASE
 const toAbs = (u) => {
@@ -161,8 +166,7 @@ export default function Home() {
     (async () => {
       try {
         const url = `${API_BASE}/slides`;
-        const res = await fetch(url, { cache: "no-store", headers: { "Cache-Control": "no-cache" } });
-        const raw = await res.json();
+        const res = await fetch(url, { cache: "no-store" });        const raw = await res.json();
 
         const arr = Array.isArray(raw) ? raw : (raw.items || raw.slides || []);
         const published = arr
@@ -188,8 +192,7 @@ export default function Home() {
       setEventsError("");
       try {
         // Public feed for homepage
-        const res = await fetch(`${API_BASE}/events/public?limit=6`, { cache: "no-store", headers: { "Cache-Control": "no-cache" } });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const res = await fetch(`${API_BASE}/events/public?limit=6`, { cache: "no-store" });        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const raw = await res.json();
         const list = Array.isArray(raw) ? raw : (raw.items || raw.events || []);
 
