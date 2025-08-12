@@ -1,8 +1,8 @@
 // src/pages/Home.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import "../styles/Home.css";
 import { Link } from "react-router-dom";
-import axios from "axios"; // ⬅ added this
+import axios from "axios";
 
 /* ---------- Base URLs like your admin page ---------- */
 const isLocalHost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
@@ -48,7 +48,6 @@ const absolutizeUploadUrl = (u) => {
   return `${API_ORIGIN}${s}`;
 };
 
-
 /* Match the admin “selector” behavior */
 const pickSlideSrc = (s) => {
   // 1) Prefer the DB 'src' if present (often already absolute)
@@ -67,11 +66,6 @@ const pickSlideSrc = (s) => {
 
   return absolutizeUploadUrl(candidate);
 };
-if (import.meta.env.DEV) {
-  console.debug("Slide URLs:", normalizedSlides.map(s => s.src));
-  console.debug("Event covers:", norm.map(e => e.cover));
-}
-
 
 const pickEventCover = (e) => {
   if (e?.coverImage) return absolutizeUploadUrl(e.coverImage);
@@ -87,7 +81,6 @@ const pickEventCover = (e) => {
 
   return absolutizeUploadUrl(candidate);
 };
-
 
 /* ==================== Icons (inline SVG) ==================== */
 const IconEducation = () => (
@@ -217,103 +210,101 @@ export default function Home() {
     return dt.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
   };
 
- /* -------- Fetch slides (published, sorted, max 3) -------- */
-useEffect(() => {
-  let mounted = true;
-  (async () => {
-    try {
-      const { data } = await API.get("/slides", { params: {} }); // no custom headers => no preflight
-      const raw =
-        Array.isArray(data) ? data :
-        (Array.isArray(data?.items) ? data.items :
-        (Array.isArray(data?.slides) ? data.slides : []));
+  /* -------- Fetch slides (published, sorted, max 3) -------- */
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const { data } = await API.get("/slides", { params: {} });
+        const raw =
+          Array.isArray(data) ? data :
+          (Array.isArray(data?.items) ? data.items :
+          (Array.isArray(data?.slides) ? data.slides : []));
 
-      const published = raw
-        .filter((s) => s?.published === true)
-        .sort((a, b) => (a?.position ?? 0) - (b?.position ?? 0))
-        .slice(0, 3);
+        const published = raw
+          .filter((s) => s?.published === true)
+          .sort((a, b) => (a?.position ?? 0) - (b?.position ?? 0))
+          .slice(0, 3);
 
-      const normalizedSlides = published.map((s, i) => ({
-        id: s?._id || s?.id || i,
-        src: pickSlideSrc(s),
-        alt: (s?.alt && String(s.alt)) || "Slide image",
-        title: (s?.title && String(s.title)) || "",
-        subtitle: (s?.subtitle && String(s.subtitle)) || "",
-        align: (s?.align && String(s.align).toLowerCase()) || "left",
-        overlay: Number(s?.overlay ?? 40),
-      }));
+        const normalizedSlides = published.map((s, i) => ({
+          id: s?._id || s?.id || i,
+          src: pickSlideSrc(s),
+          alt: (s?.alt && String(s.alt)) || "Slide image",
+          title: (s?.title && String(s.title)) || "",
+          subtitle: (s?.subtitle && String(s.subtitle)) || "",
+          align: (s?.align && String(s.align).toLowerCase()) || "left",
+          overlay: Number(s?.overlay ?? 40),
+        }));
 
-      if (import.meta.env.DEV) {
-        console.debug("Slides normalized:", normalizedSlides.map(x => x.src));
+        if (import.meta.env.DEV) {
+          console.debug("Slides normalized:", normalizedSlides.map(x => x.src));
+        }
+
+        if (mounted) setSlides(normalizedSlides);
+      } catch (err) {
+        console.error("Failed to fetch slides", err);
+      } finally {
+        if (mounted) setLoadingSlides(false);
       }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
-      if (mounted) setSlides(normalizedSlides);
-    } catch (err) {
-      console.error("Failed to fetch slides", err);
-    } finally {
-      if (mounted) setLoadingSlides(false);
-    }
-  })();
-  return () => {
-    mounted = false;
-  };
-}, []);
+  /* -------- Fetch recent events (published) -------- */
+  useEffect(() => {
+    let mounted = true;
 
+    (async () => {
+      setEventsLoading(true);
+      setEventsError("");
+      try {
+        const { data } = await API.get("/events/public", { params: { limit: 6 } });
+        const list =
+          Array.isArray(data) ? data :
+          (Array.isArray(data?.items) ? data.items :
+          (Array.isArray(data?.events) ? data.events : []));
 
-/* -------- Fetch recent events (published) -------- */
-useEffect(() => {
-  let mounted = true;
+        const norm = list.map((e, i) => {
+          const id = e?._id || e?.id || i;
+          const title = String(e?.title || e?.name || "Untitled");
 
-  (async () => {
-    setEventsLoading(true);
-    setEventsError("");
-    try {
-      const { data } = await API.get("/events/public", { params: { limit: 6 } });
-      const list =
-        Array.isArray(data) ? data :
-        (Array.isArray(data?.items) ? data.items :
-        (Array.isArray(data?.events) ? data.events : []));
+          const cover = pickEventCover(e);
 
-      const norm = list.map((e, i) => {
-        const id = e?._id || e?.id || i;
-        const title = String(e?.title || e?.name || "Untitled");
-      
-        const cover = pickEventCover(e);
-      
-        const category = (e?.category && (e.category.name || e.category)) || "Event";
-        const location = e?.location || e?.city || "";
-        const when = e?.date || e?.publishedAt || e?.createdAt || null;
-        const desc = truncate(stripTags(e?.description || e?.excerpt || ""), 160);
-      
-        return {
-          id,
-          title,
-          cover,
-          category,
-          location,
-          whenLabel: fmtDate(when),
-          desc,
-        };
-      });
-      
-      if (import.meta.env.DEV) {
-        console.debug("Events covers:", norm.map(x => x.cover));
+          const category = (e?.category && (e.category.name || e.category)) || "Event";
+          const location = e?.location || e?.city || "";
+          const when = e?.date || e?.publishedAt || e?.createdAt || null;
+          const desc = truncate(stripTags(e?.description || e?.excerpt || ""), 160);
+
+          return {
+            id,
+            title,
+            cover,
+            category,
+            location,
+            whenLabel: fmtDate(when),
+            desc,
+          };
+        });
+
+        if (import.meta.env.DEV) {
+          console.debug("Events covers:", norm.map(x => x.cover));
+        }
+
+        if (mounted) setEvents(norm);
+      } catch (err) {
+        console.error("Failed to fetch events", err);
+        if (mounted) setEventsError("Could not load events right now.");
+      } finally {
+        if (mounted) setEventsLoading(false);
       }
+    })();
 
-      if (mounted) setEvents(norm);
-    } catch (err) {
-      console.error("Failed to fetch events", err);
-      if (mounted) setEventsError("Could not load events right now.");
-    } finally {
-      if (mounted) setEventsLoading(false);
-    }
-  })();
-
-  return () => {
-    mounted = false;
-  };
-}, []);
-
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   /* -------- UI helpers -------- */
   const showHeroText = !loadingSlides && slides.length > 0;
