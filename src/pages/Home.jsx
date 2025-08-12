@@ -1,36 +1,57 @@
 // src/pages/Home.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import "../styles/Home.css";
-import axios from "axios";
+import axios from "axios"; // kept in case other code relies on it
 import { Link } from "react-router-dom";
 
-// Helper functions for API base URL
+/* ==================== API BASE ==================== */
 const strip = (s) => (s || "").replace(/\/+$/, "");
 const isLocalHost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
 
-// Priority:
-// 1) VITE_API_URL (explicit override for this build)
-// 2) If on localhost -> local API (env or default)
-// 3) Else -> deployed API fallback
+/**
+ * Priority:
+ * - If app runs on localhost => use VITE_API_URL (local) or default to http://localhost:5000/api
+ * - Else => use VITE_API_DEPLOY (prod) or default to your Render URL
+ * - Guard: never allow localhost when the bundle is built for production
+ */
 const API_BASE = (() => {
-  const fromEnv = import.meta.env.VITE_API_URL;
-  if (fromEnv) return strip(fromEnv);
-  if (isLocalHost) return strip(import.meta.env.VITE_API_LOCAL || "http://localhost:5000/api");
-  return strip(import.meta.env.VITE_API_DEPLOY || "https://charity-backend-30xl.onrender.com/api");
+  const localEnv = strip(import.meta.env.VITE_API_URL || "http://localhost:5000/api");
+  const deployEnv = strip(
+    import.meta.env.VITE_API_DEPLOY || "https://charity-backend-30xl.onrender.com/api"
+  );
+
+  let base = isLocalHost ? localEnv : deployEnv;
+
+  // Extra safety: if a prod build somehow carries localhost, fall back to deploy
+  if (import.meta.env.PROD && /^https?:\/\/(localhost|127\.0\.0\.1)/i.test(base)) {
+    base = deployEnv;
+  }
+  return base;
 })();
 
-// Extract origin without /api for media URLs
+/**
+ * For media like /uploads/abc.jpg we need the server **origin** (no /api).
+ * Example: API_BASE = https://host.com/api  -> API_ORIGIN = https://host.com
+ */
 const API_ORIGIN = API_BASE.replace(/\/api(?:\/.*)?$/, "");
 
-// Helper to turn /uploads/... into absolute URLs against API_ORIGIN
+/**
+ * Normalize media URLs coming from the API. Accepts:
+ * - absolute URLs (returned as-is)
+ * - data: / blob: (returned as-is)
+ * - /uploads/... or uploads/...
+ * - sometimes backends accidentally return /api/uploads/..., strip the /api
+ */
 const toMediaUrl = (u) => {
   if (!u) return "";
-  if (/^https?:\/\//i.test(u)) return u;
-  const path = u.startsWith("/") ? u : `/${u}`;
-  return `${API_ORIGIN}${path}`; // /uploads/... -> https://host/uploads/...
+  if (/^(https?:)?\/\//i.test(u) || /^data:|^blob:/i.test(u)) return u;
+  let path = u.startsWith("/") ? u : `/${u}`;
+  // If backend accidentally prepended /api before /uploads, drop that piece
+  path = path.replace(/\/api(?=\/uploads\/)/, "");
+  return `${API_ORIGIN}${path}`;
 };
 
-/* -------- Icons (inline SVG, no external libs) -------- */
+/* ==================== Icons (inline SVG) ==================== */
 const IconEducation = () => (
   <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">
     <path d="M12 3L1 9l11 6 9-4.91V17h2V9L12 3z" />
@@ -62,8 +83,7 @@ const IconDonate = () => (
     <path d="M12 21s-8-4.5-8-10a5 5 0 019-3 5 5 0 019 3c0 5.5-8 10-8 10z" />
   </svg>
 );
-
-/* -------- New icons for the focus row -------- */
+/* Focus row icons */
 const IconDisability = () => (
   <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">
     <path d="M12 4a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm-7 16a7 7 0 0 1 14 0H5Z" />
@@ -87,7 +107,7 @@ const IconGrants = () => (
   </svg>
 );
 
-/* -------- CountUp (animated stats) -------- */
+/* ==================== CountUp ==================== */
 function CountUp({ end, start = 0, duration = 1500, compact = false, suffix = "" }) {
   const ref = React.useRef(null);
   const [text, setText] = React.useState(compact ? "0" : "0");
@@ -96,7 +116,6 @@ function CountUp({ end, start = 0, duration = 1500, compact = false, suffix = ""
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-
     const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const format = (val) => {
       const nf = compact
@@ -139,7 +158,7 @@ function CountUp({ end, start = 0, duration = 1500, compact = false, suffix = ""
   return <span ref={ref}>{text}</span>;
 }
 
-/* ---------------- Page ---------------- */
+/* ==================== Page ==================== */
 export default function Home() {
   const [slides, setSlides] = useState([]);
   const [loadingSlides, setLoadingSlides] = useState(true);
@@ -151,7 +170,7 @@ export default function Home() {
   const [eventsLoading, setEventsLoading] = useState(true);
   const [eventsError, setEventsError] = useState("");
 
-  // Helper utils (events)
+  // Helpers (events)
   const stripTags = (html = "") => html.replace(/<[^>]*>/g, " ");
   const truncate = (s = "", n = 160) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
   const fmtDate = (d) => {
@@ -160,62 +179,73 @@ export default function Home() {
     return dt.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
   };
 
-  // Fetch slides from backend (published only, sorted)
+  /* -------- Fetch slides (published, sorted, max 3) -------- */
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         const url = `${API_BASE}/slides`;
-        const res = await fetch(url, { cache: "no-store", headers: { "Cache-Control": "no-cache" } });
+        const res = await fetch(url, { cache: "no-store" }); // no custom headers => no preflight CORS issue
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const raw = await res.json();
-        const arr = Array.isArray(raw) ? raw : (raw.items || raw.slides || []);
-        const published = arr
-          .filter(s => s?.published === true)
-          .sort((a, b) => (a.position || 0) - (b.position || 0));
 
-        // Update src to use toMediaUrl
+        const arr = Array.isArray(raw) ? raw : raw.items || raw.slides || [];
+        const published = arr
+          .filter((s) => s?.published === true)
+          .sort((a, b) => (a.position || 0) - (b.position || 0))
+          .slice(0, 3);
+
+        // Normalize
         const normalizedSlides = published.map((s, i) => ({
           id: s._id || s.id || i,
-          src: toMediaUrl(s.src || s.image || s.url || ""),
+          src: toMediaUrl(
+            s.src ||
+              s.image ||
+              s.url ||
+              s.file?.url ||
+              (Array.isArray(s.images) && (s.images[0]?.url || s.images[0])) ||
+              ""
+          ),
           alt: (s.alt && String(s.alt)) || "Slide image",
           title: (s.title && String(s.title)) || "",
           subtitle: (s.subtitle && String(s.subtitle)) || "",
           align: (s.align && String(s.align).toLowerCase()) || "left",
-          overlay: Number(s.overlay ?? 40)
+          overlay: Number(s.overlay ?? 40), // 0-100
         }));
 
         if (mounted) setSlides(normalizedSlides);
       } catch (e) {
-        console.error('Failed to fetch slides', e);
+        console.error("Failed to fetch slides", e);
       } finally {
         if (mounted) setLoadingSlides(false);
       }
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  // Fetch recent events (published)
+  /* -------- Fetch recent events (published) -------- */
   useEffect(() => {
     let mounted = true;
     (async () => {
       setEventsLoading(true);
       setEventsError("");
       try {
-        const res = await fetch(`${API_BASE}/events/public?limit=6`, { cache: "no-store", headers: { "Cache-Control": "no-cache" } });
+        const res = await fetch(`${API_BASE}/events/public?limit=6`, { cache: "no-store" });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const raw = await res.json();
-        const list = Array.isArray(raw) ? raw : (raw.items || raw.events || []);
-        
-        // Update cover to use toMediaUrl
+        const list = Array.isArray(raw) ? raw : raw.items || raw.events || [];
+
         const norm = list.map((e, i) => {
           const id = e._id || e.id || i;
           const title = String(e.title || e.name || "Untitled");
           const cover = toMediaUrl(
             e.coverImage ||
-            e.cover?.url ||
-            e.image ||
-            (Array.isArray(e.images) && (e.images[0]?.url || e.images[0])) ||
-            ""
+              e.cover?.url ||
+              e.image ||
+              (Array.isArray(e.images) && (e.images[0]?.url || e.images[0])) ||
+              ""
           );
           const category = (e.category && (e.category.name || e.category)) || "Event";
           const location = e.location || e.city || "";
@@ -241,35 +271,27 @@ export default function Home() {
         if (mounted) setEventsLoading(false);
       }
     })();
-    return () => { mounted = false; };
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  // Quick diagnostics while testing
-  if (process.env.NODE_ENV !== "production") {
-    return (
-      <div style={{ position: 'fixed', bottom: 8, left: 8, background: '#000a', color: '#fff', padding: '6px 8px', borderRadius: 6, fontSize: 12, zIndex: 9999 }}>
-        API: {API_BASE} • slides: {slides.length} • events: {events.length}
-      </div>
-    );
-  }
-
-  // Compute before effects that use them
+  /* -------- UI helpers -------- */
   const showHeroText = !loadingSlides && slides.length > 0;
   const current = slides[currentSlide] || {};
 
-  // Simple scroll-reveal for .reveal (and force hero text visible when ready)
+  // Scroll-reveal for .reveal & force hero text visible when ready
   useEffect(() => {
-    const els = document.querySelectorAll('.reveal');
+    const els = document.querySelectorAll(".reveal");
     const io = new IntersectionObserver(
-      (entries) => entries.forEach((e) => e.isIntersecting && e.target.classList.add('in-view')),
+      (entries) => entries.forEach((e) => e.isIntersecting && e.target.classList.add("in-view")),
       { threshold: 0.15 }
     );
     els.forEach((el) => io.observe(el));
 
     if (showHeroText) {
-      document
-        .querySelectorAll('.hero-text-card .reveal')
-        .forEach((el) => el.classList.add('in-view'));
+      document.querySelectorAll(".hero-text-card .reveal").forEach((el) => el.classList.add("in-view"));
     }
 
     return () => io.disconnect();
@@ -296,6 +318,25 @@ export default function Home() {
 
   return (
     <main className="home">
+      {/* Small dev badge (doesn't block the page) */}
+      {import.meta.env.DEV && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: 8,
+            left: 8,
+            background: "#000a",
+            color: "#fff",
+            padding: "6px 8px",
+            borderRadius: 6,
+            fontSize: 12,
+            zIndex: 9999,
+          }}
+        >
+          API: {API_BASE} • slides: {slides.length} • events: {events.length}
+        </div>
+      )}
+
       {/* HERO SECTION */}
       <section className="hero-section">
         {/* IMAGES CONTAINER */}
@@ -311,16 +352,16 @@ export default function Home() {
           {/* Real slides */}
           {slides.map((img, i) => {
             const key = img.id ?? i;
-            const alt = img.alt?.trim() || 'Homepage slide';
-            const overlay = (typeof img.overlay === 'number' ? img.overlay : 40) / 100;
+            const alt = img.alt?.trim() || "Homepage slide";
+            const overlay = (typeof img.overlay === "number" ? img.overlay : 40) / 100;
             return (
-              <div key={key} className={`hero-image-wrapper ${i === currentSlide ? 'active' : ''}`}>
+              <div key={key} className={`hero-image-wrapper ${i === currentSlide ? "active" : ""}`}>
                 <img
                   src={img.src}
                   alt={alt}
                   className="hero-image"
-                  loading="eager"
-                  onError={(e) => e.currentTarget.classList.add('hero-image--error')}
+                  loading={i === 0 ? "eager" : "lazy"}
+                  onError={(e) => e.currentTarget.classList.add("hero-image--error")}
                 />
                 {/* per-slide dark overlay from backend */}
                 <div className="hero-overlay" style={{ backgroundColor: `rgba(0,0,0,${overlay})` }} />
@@ -333,24 +374,24 @@ export default function Home() {
         {showHeroText && (
           <div
             className={`hero-content-container align-${
-              current.align === 'center' ? 'center' : current.align === 'right' ? 'right' : 'left'
+              current.align === "center" ? "center" : current.align === "right" ? "right" : "left"
             }`}
           >
             <div className="hero-text-content">
               <div className="hero-text-card">
                 <span className="hero-badge reveal">Non-Profit | Community First</span>
 
-                <h1 className="hero-title reveal">
-                  {current.title?.trim() || 'Headline goes here'}
-                </h1>
+                <h1 className="hero-title reveal">{current.title?.trim() || "Headline goes here"}</h1>
 
-                <p className="hero-subtitle reveal">
-                  {current.subtitle?.trim() || 'Subtitle shows here'}
-                </p>
+                <p className="hero-subtitle reveal">{current.subtitle?.trim() || "Subtitle shows here"}</p>
 
                 <div className="hero-actions reveal">
-                  <Link to="/donate" className="btn btn-primary sheen">Donate</Link>
-                  <Link to="/volunteers" className="btn btn-ghost">Volunteer</Link>
+                  <Link to="/donate" className="btn btn-primary sheen">
+                    Donate
+                  </Link>
+                  <Link to="/volunteers" className="btn btn-ghost">
+                    Volunteer
+                  </Link>
                 </div>
               </div>
             </div>
@@ -360,13 +401,17 @@ export default function Home() {
         {/* CONTROLS */}
         {slides.length > 1 && (
           <>
-            <button className="bg-arrow left" onClick={prev} aria-label="Previous image">‹</button>
-            <button className="bg-arrow right" onClick={next} aria-label="Next image">›</button>
+            <button className="bg-arrow left" onClick={prev} aria-label="Previous image">
+              ‹
+            </button>
+            <button className="bg-arrow right" onClick={next} aria-label="Next image">
+              ›
+            </button>
             <div className="carousel-dots" role="tablist" aria-label="Choose slide">
               {slides.map((_, index) => (
                 <button
                   key={index}
-                  className={`dot ${index === currentSlide ? 'active' : ''}`}
+                  className={`dot ${index === currentSlide ? "active" : ""}`}
                   onClick={() => goToSlide(index)}
                   role="tab"
                   aria-selected={index === currentSlide}
@@ -380,45 +425,63 @@ export default function Home() {
 
       {/* WHAT WE DO (Colored Cards) — WIDE */}
       <section className="section container-wide what-we-do" aria-labelledby="what-title">
-        <h2 id="what-title" className="reveal">What We Do</h2>
-        <p className="muted center reveal">
-          Programs designed with local partners to create lasting impact.
-        </p>
+        <h2 id="what-title" className="reveal">
+          What We Do
+        </h2>
+        <p className="muted center reveal">Programs designed with local partners to create lasting impact.</p>
 
         {/* Charity focus row */}
         <div className="charity-focus reveal">
-          <div className="focus-item"><IconDisability /> Disability</div>
-          <div className="focus-item"><IconReligion /> Religious Activities</div>
-          <div className="focus-item"><IconPublic /> The General Public / Mankind</div>
-          <div className="focus-item"><IconGrants /> Makes Grants To Individuals</div>
-          <div className="focus-item"><IconGrants /> Makes Grants To Organisations</div>
+          <div className="focus-item">
+            <IconDisability /> Disability
+          </div>
+          <div className="focus-item">
+            <IconReligion /> Religious Activities
+          </div>
+          <div className="focus-item">
+            <IconPublic /> The General Public / Mankind
+          </div>
+          <div className="focus-item">
+            <IconGrants /> Makes Grants To Individuals
+          </div>
+          <div className="focus-item">
+            <IconGrants /> Makes Grants To Organisations
+          </div>
         </div>
 
         {/* Existing cards */}
         <div className="cards cards-wide">
           <Link to="/projects" className="card card-edu reveal tilt">
-            <div className="card-icon"><IconEducation /></div>
+            <div className="card-icon">
+              <IconEducation />
+            </div>
             <h3>Education Access</h3>
             <p>Scholarships, school kits, and teacher support for every child's future.</p>
             <span className="chip">Learn more →</span>
           </Link>
 
           <Link to="/projects" className="card card-health reveal tilt">
-            <div className="card-icon"><IconHealth /></div>
+            <div className="card-icon">
+              <IconHealth />
+            </div>
             <h3>Healthcare Support</h3>
             <p>Mobile clinics, telemedicine, and maternal health initiatives.</p>
             <span className="chip">See programs →</span>
           </Link>
 
           <Link to="/projects" className="card card-water reveal tilt">
-            <div className="card-icon"><IconWater /></div>
+            <div className="card-icon">
+              <IconWater />
+            </div>
             <h3>Clean Water</h3>
             <p>Wells, filtration, and hygiene training for safe communities.</p>
             <span className="chip">Explore work →</span>
           </Link>
 
           <Link to="/projects" className="card card-empower reveal tilt">
-            <div className="card-icon"><IconEmpower /></div>
+            <div className="card-icon">
+              <IconEmpower />
+            </div>
             <h3>Empowerment</h3>
             <p>Skills, micro-grants, and youth programs for independence.</p>
             <span className="chip">Get inspired →</span>
@@ -426,13 +489,12 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ===== RECENT EVENTS (from API) ===== */}
+      {/* ===== NEW: RECENT EVENTS (from API) ===== */}
       <section className="section container-wide mission" aria-labelledby="mission-title">
         <div className="mission-head">
-          <h2 id="mission-title" className="reveal">Recent Events</h2>
-          <p className="muted reveal">
-            Highlights from our latest field activities and community programs.
-          </p>
+          <h2 id="mission-title" className="reveal">
+            Recent Events
+          </h2>
         </div>
 
         {/* Loading skeletons */}
@@ -452,9 +514,7 @@ export default function Home() {
         )}
 
         {/* Error / Empty states */}
-        {!eventsLoading && eventsError && (
-          <div className="events-error">{eventsError}</div>
-        )}
+        {!eventsLoading && eventsError && <div className="events-error">{eventsError}</div>}
         {!eventsLoading && !eventsError && events.length === 0 && (
           <div className="events-empty">No events yet. Please check back soon.</div>
         )}
@@ -464,7 +524,6 @@ export default function Home() {
           <div className="events-grid">
             {events.map((ev) => (
               <article key={ev.id} className="event-card hover-pop">
-                {/* show image same way as slides: single URL string */}
                 <div className="cover" aria-hidden="true">
                   {ev.cover ? (
                     <img
@@ -472,7 +531,9 @@ export default function Home() {
                       src={ev.cover}
                       alt={ev.title}
                       loading="lazy"
-                      onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }}
+                      onError={(e) => {
+                        e.currentTarget.style.visibility = "hidden";
+                      }}
                     />
                   ) : null}
                 </div>
@@ -493,38 +554,55 @@ export default function Home() {
       </section>
 
       {/* MISSION — WIDE */}
-      <section className="section container-wide mission" aria-labelledby="mission-title">
-        <h2 id="mission-title" className="reveal">Our Mission</h2>
+      <section className="section container-wide mission" aria-labelledby="mission-title-2">
+        <h2 id="mission-title-2" className="reveal">
+          Our Mission
+        </h2>
         <p className="mission-text reveal">
-          To empower children and families through access to quality education, essential healthcare,
-          and sustainable community projects—delivered with transparency, dignity, and local
-          partnership.
+          To empower children and families through access to quality education, essential healthcare, and sustainable
+          community projects—delivered with transparency, dignity, and local partnership.
         </p>
 
         <ul className="pill-list reveal" aria-label="Mission focus areas">
-          <li><IconEducation /> Education</li>
-          <li><IconHealth /> Health</li>
-          <li><IconWater /> Water & Sanitation</li>
-          <li><IconEmpower /> Women & Youth</li>
+          <li>
+            <IconEducation /> Education
+          </li>
+          <li>
+            <IconHealth /> Health
+          </li>
+          <li>
+            <IconWater /> Water & Sanitation
+          </li>
+          <li>
+            <IconEmpower /> Women & Youth
+          </li>
         </ul>
       </section>
 
       {/* INFO / QUICK STATS — WIDE */}
       <section className="section container-wide stats" aria-label="Impact statistics">
         <article className="stat reveal hover-pop">
-          <span className="num"><CountUp end={120} suffix="+" /></span>
+          <span className="num">
+            <CountUp end={120} suffix="+" />
+          </span>
           <span className="label">Projects Funded</span>
         </article>
         <article className="stat reveal hover-pop">
-          <span className="num"><CountUp end={30000} compact suffix="+" /></span>
+          <span className="num">
+            <CountUp end={30000} compact suffix="+" />
+          </span>
           <span className="label">People Reached</span>
         </article>
         <article className="stat reveal hover-pop">
-          <span className="num"><CountUp end={50} suffix="+" /></span>
+          <span className="num">
+            <CountUp end={50} suffix="+" />
+          </span>
           <span className="label">Active Volunteers</span>
         </article>
         <article className="stat reveal hover-pop">
-          <span className="num"><CountUp end={15} /></span>
+          <span className="num">
+            <CountUp end={15} />
+          </span>
           <span className="label">Partner Communities</span>
         </article>
       </section>
@@ -533,14 +611,18 @@ export default function Home() {
       <section className="section container-wide get-involved" aria-label="Get involved">
         <div className="cta-grid cta-grid-wide">
           <Link to="/donate" className="cta-card shine reveal">
-            <div className="cta-icon"><IconDonate /></div>
+            <div className="cta-icon">
+              <IconDonate />
+            </div>
             <h3>Donate</h3>
             <p>Your gift funds urgent needs and long-term solutions.</p>
             <span className="cta-btn">Give Now</span>
           </Link>
 
           <Link to="/volunteers" className="cta-card outline reveal">
-            <div className="cta-icon"><IconVolunteer /></div>
+            <div className="cta-icon">
+              <IconVolunteer />
+            </div>
             <h3>Volunteer</h3>
             <p>Join hands-on projects or remote support teams.</p>
             <span className="cta-btn">Join Us</span>
@@ -553,8 +635,12 @@ export default function Home() {
         <h3 className="reveal">See our latest work</h3>
         <p className="reveal">Browse ongoing initiatives and real stories from the field.</p>
         <div className="cta-actions reveal">
-          <Link to="/projects" className="btn btn-primary sheen">View Projects</Link>
-          <Link to="/contact" className="btn btn-ghost">Contact Us</Link>
+          <Link to="/projects" className="btn btn-primary sheen">
+            View Projects
+          </Link>
+          <Link to="/contact" className="btn btn-ghost">
+            Contact Us
+          </Link>
         </div>
       </section>
     </main>
