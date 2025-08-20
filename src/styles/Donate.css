@@ -234,3 +234,292 @@
     .custom-amount input{ width: 110px; }
   }
   
+/* Project Selection Styles */
+.selected-project {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  background: var(--ghost);
+  border-radius: 12px;
+  margin-bottom: 1rem;
+  border: 1px solid var(--outline);
+}
+
+.project-info h4 {
+  margin: 0 0 0.25rem 0;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.project-category {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.remove-project {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.remove-project:hover {
+  color: #b42121;
+  background: rgba(180, 33, 33, 0.1);
+}
+
+.btn-select-project {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: var(--ghost);
+  border: 1px dashed var(--outline);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 700;
+  color: var(--text);
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+
+.btn-select-project:hover {
+  background: var(--bg);
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+/* Project Selector Modal */
+.project-selector-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+  background: white;
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--outline);
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.close-modal {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.close-modal:hover {
+  color: var(--text);
+  background: var(--ghost);
+}
+
+.search-box {
+  position: relative;
+  padding: 1rem 1.5rem 0;
+  margin-bottom: 0.5rem;
+}
+
+.search-box .icon {
+  position: absolute;
+  left: 2rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  color: var(--muted);
+}
+
+.search-box input {
+  width: 100%;
+  padding: 0.75rem 1rem 0.75rem 2.5rem;
+  border: 1px solid var(--outline);
+  border-radius: 12px;
+  font-size: 1rem;
+  box-shadow: var(--shadow);
+}
+
+.search-box input:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(15, 108, 255, 0.12), var(--shadow);
+}
+
+.projects-list {
+  padding: 0 1rem 1rem;
+  overflow-y: auto;
+  max-height: 40vh;
+}
+
+.project-item {
+  padding: 1rem;
+  border: 1px solid var(--outline);
+  border-radius: 12px;
+  margin-bottom: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.project-item:hover {
+  border-color: var(--brand);
+  box-shadow: 0 4px 12px rgba(15, 108, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+.project-details h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.project-details p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.project-progress {
+  margin-top: 0.75rem;
+}
+
+.progress-bar {
+  height: 6px;
+  background: var(--ghost);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 0.4rem;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--brand);
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+.progress-text {
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.loading, .error, .no-projects {
+  text-align: center;
+  padding: 2rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.error {
+  color: #b42121;
+}
+
+/* Selected Project Summary */
+.selected-project-summary {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px dashed var(--outline);
+}
+
+.selected-project-summary h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.selected-project-summary p {
+  margin: 0 0 0.75rem 0;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.project-progress-summary {
+  margin-top: 0.75rem;
+}
+
+.project-progress-summary .progress-bar {
+  height: 4px;
+}
+
+.project-progress-summary .progress-text {
+  font-size: 0.75rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .modal-content {
+    max-height: 85vh;
+  }
+  
+  .modal-header {
+    padding: 1.25rem;
+  }
+  
+  .search-box {
+    padding: 0.75rem 1.25rem 0;
+  }
+  
+  .projects-list {
+    padding: 0 1rem 1rem;
+    max-height: 50vh;
+  }
+  
+  .project-item {
+    padding: 0.85rem;
+  }
+}  

@@ -81,16 +81,6 @@ export default function Volunteers() {
     setCv(file);
   }
 
-  async function uploadCvFile(file) {
-    const base = import.meta.env.VITE_API_URL || '';
-    const formData = new FormData();
-    formData.append('cv', file);
-    const r = await fetch(`${base}/upload/cv`, { method: 'POST', body: formData });
-    if (!r.ok) throw new Error('CV upload failed');
-    const data = await r.json();
-    return data.url; // backend returns { url }
-  }
-
   async function handleSubmit(e) {
     e.preventDefault();
 
@@ -105,29 +95,28 @@ export default function Volunteers() {
 
     try {
       const base = import.meta.env.VITE_API_URL || '';
-      let cvUrl = '';
+      const formData = new FormData();
+      
+      // Append all form data
+      formData.append('fullName', fullName);
+      formData.append('email', email);
+      formData.append('phone', phone);
+      formData.append('city', city);
+      formData.append('district', district);
+      formData.append('availability', availability);
+      formData.append('role', role);
+      formData.append('skills', skills);
+      formData.append('message', message);
+      formData.append('interests', JSON.stringify(interests));
+      
+      // Append CV file if exists
       if (cv) {
-        cvUrl = await uploadCvFile(cv);
+        formData.append('cv', cv);
       }
-
-      const payload = {
-        fullName,
-        email,
-        phone,
-        city,
-        district,
-        availability,
-        role,
-        skills,
-        message,
-        interests,
-        cv: cvUrl
-      };
 
       const r = await fetch(`${base}/volunteers/apply`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: formData
       });
 
       const data = await r.json();

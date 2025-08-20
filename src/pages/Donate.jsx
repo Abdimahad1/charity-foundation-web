@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import '../styles/Donate.css';
 
@@ -18,6 +18,11 @@ const IconInfo = () => (
     <path d="M11 7h2v2h-2V7zm0 4h2v6h-2v-6zm1-9a10 10 0 100 20 10 10 0 000-20z"/>
   </svg>
 );
+const IconSearch = () => (
+  <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 001.48-5.34c-.47-2.78-2.79-5-5.59-5.34a6.505 6.505 0 00-7.27 7.27c.34 2.8 2.56 5.12 5.34 5.59a6.5 6.5 0 005.34-1.48l.27.28v.79l4.25 4.25c.41.41 1.08.41 1.49 0 .41-.41.41-1.08 0-1.49L15.5 14zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+  </svg>
+);
 
 export default function Donate() {
   const [method, setMethod] = useState('EVC'); // 'EVC' | 'EDAHAB'
@@ -29,59 +34,69 @@ export default function Donate() {
   const [email, setEmail] = useState('');
   const [note, setNote] = useState('');
   const [agree, setAgree] = useState(false);
+  const [projectId, setProjectId] = useState(null);
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [showProjectSelector, setShowProjectSelector] = useState(false);
+
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const [loading, setLoading] = useState(false);
   const [txRef, setTxRef] = useState(null);
   const [status, setStatus] = useState(null); // 'pending' | 'success' | 'failed'
   const pollRef = useRef(null);
 
-  const [rows, setRows] = useState([]);      // stores charity list
-  const [q, setQ] = useState('');            // search query
-  const [total, setTotal] = useState(0);     // total charities count
-  const [error, setError] = useState('');    // error message
+  const [projects, setProjects] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [projectsLoading, setProjectsLoading] = useState(false);
+  const [projectsError, setProjectsError] = useState('');
 
-  // New state for pagination
-  const [page, setPage] = useState(1);
-  const [limit] = useState(50); // adjust if you add UI for it
-  const [charityTotal, setCharityTotal] = useState(0);
-
-  // Fetch charities with params
-  const fetchRows = async ({ q = "", status = "all", page = 1, limit = 50 } = {}) => {
-    setLoading(true);
-    try {
-      const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/charities`, {
-        params: { q, status, page, limit },
-      });
-      setRows(data.items || data);
-      setTotal(data.total || data.length);
-    } catch (error) {
-      console.error(error);
-      setError("Failed to load charities.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Load once on mount
+  // Fetch projects from backend
   useEffect(() => {
-    fetchRows({ q: '', status: 'all', page, limit });
+    const fetchProjects = async () => {
+      setProjectsLoading(true);
+      try {
+        const base = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+        const res = await axios.get(`${base}/charities`);
+        setProjects(res.data.items || res.data || []);
+      } catch (err) {
+        console.error('Error fetching projects', err);
+        setProjectsError('Failed to load projects');
+      } finally {
+        setProjectsLoading(false);
+      }
+    };
+    
+    fetchProjects();
   }, []);
 
-  // Refetch when status or page changes
+  // Check for project ID in URL or session storage
   useEffect(() => {
-    fetchRows({ q: '', status, page, limit });
-  }, [status, page]);
+    const urlParams = new URLSearchParams(location.search);
+    const projectIdFromUrl = urlParams.get('projectId');
+    
+    if (projectIdFromUrl) {
+      setProjectId(projectIdFromUrl);
+      // Find and set the selected project
+      const project = projects.find(p => p._id === projectIdFromUrl);
+      if (project) {
+        setSelectedProject(project);
+      }
+    } else {
+      const storedProjectId = sessionStorage.getItem('selectedProjectId');
+      if (storedProjectId) {
+        setProjectId(storedProjectId);
+        // Find and set the selected project
+        const project = projects.find(p => p._id === storedProjectId);
+        if (project) {
+          setSelectedProject(project);
+        }
+        sessionStorage.removeItem('selectedProjectId');
+      }
+    }
+  }, [location, projects]);
 
-  // Debounce search (q)
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setPage(1);
-      fetchRows({ q, status, page: 1, limit });
-    }, 300);
-    return () => clearTimeout(t);
-  }, [q]);
-
-  // Reveal-on-scroll
+  // Reveal-on-scroll animation
   useEffect(() => {
     const els = document.querySelectorAll('.reveal');
     const io = new IntersectionObserver(
@@ -156,12 +171,13 @@ export default function Donate() {
     const base = import.meta.env.VITE_API_URL || '';
     const payload = {
       method,
-      amount: Number(finalAmount),     // ensure number
+      amount: Number(finalAmount),
       currency,
       name: name?.trim(),
       phone: phone?.trim(),
       email: email?.trim(),
-      note: note?.trim()
+      note: note?.trim(),
+      projectId: projectId || undefined // Only include if a project is selected
     };
 
     try {
@@ -205,6 +221,28 @@ export default function Donate() {
   // Cleanup polling on unmount
   useEffect(() => () => clearPolling(), []);
 
+  // Filter projects based on search query
+  const filteredProjects = useMemo(() => {
+    if (!searchQuery) return projects;
+    const query = searchQuery.toLowerCase();
+    return projects.filter(p => 
+      p.title?.toLowerCase().includes(query) || 
+      p.location?.toLowerCase().includes(query) ||
+      p.category?.toLowerCase().includes(query)
+    );
+  }, [projects, searchQuery]);
+
+  const handleProjectSelect = (project) => {
+    setProjectId(project._id);
+    setSelectedProject(project);
+    setShowProjectSelector(false);
+  };
+
+  const handleRemoveProject = () => {
+    setProjectId(null);
+    setSelectedProject(null);
+  };
+
   return (
     <main className="donate">
       {/* HERO */}
@@ -225,6 +263,94 @@ export default function Donate() {
       <section className="section container-wide form-grid">
         {/* Left: Payment form */}
         <form className="card form reveal" onSubmit={handleSubmit}>
+          {/* Project Selection */}
+          <div className="form-row">
+            <label className="label">Select a Project (Optional)</label>
+            {selectedProject ? (
+              <div className="selected-project">
+                <div className="project-info">
+                  <h4>{selectedProject.title}</h4>
+                  <p className="project-category">{selectedProject.category} • {selectedProject.location}</p>
+                </div>
+                <button 
+                  type="button" 
+                  className="remove-project"
+                  onClick={handleRemoveProject}
+                >
+                  ×
+                </button>
+              </div>
+            ) : (
+              <button 
+                type="button" 
+                className="btn-select-project"
+                onClick={() => setShowProjectSelector(true)}
+              >
+                Select a specific project
+              </button>
+            )}
+          </div>
+
+          {showProjectSelector && (
+            <div className="project-selector-modal">
+              <div className="modal-content">
+                <div className="modal-header">
+                  <h3>Select a Project</h3>
+                  <button 
+                    className="close-modal"
+                    onClick={() => setShowProjectSelector(false)}
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="search-box">
+                  <IconSearch />
+                  <input
+                    type="text"
+                    placeholder="Search projects..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+                <div className="projects-list">
+                  {projectsLoading ? (
+                    <div className="loading">Loading projects...</div>
+                  ) : projectsError ? (
+                    <div className="error">{projectsError}</div>
+                  ) : filteredProjects.length === 0 ? (
+                    <div className="no-projects">No projects found</div>
+                  ) : (
+                    filteredProjects.map(project => (
+                      <div 
+                        key={project._id} 
+                        className="project-item"
+                        onClick={() => handleProjectSelect(project)}
+                      >
+                        <div className="project-details">
+                          <h4>{project.title}</h4>
+                          <p>{project.category} • {project.location}</p>
+                        </div>
+                        <div className="project-progress">
+                          <div className="progress-bar">
+                            <div 
+                              className="progress-fill" 
+                              style={{ 
+                                width: `${project.goal ? Math.min(100, Math.round((Number(project.raised || 0) / Number(project.goal || 1)) * 100)) : 0}%` 
+                              }}
+                            ></div>
+                          </div>
+                          <div className="progress-text">
+                            ${Number(project.raised || 0).toLocaleString()} of ${Number(project.goal || 0).toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="form-row">
             <label className="label">Payment Method</label>
             <div className="tabs">
@@ -247,8 +373,8 @@ export default function Donate() {
                 aria-pressed={method === 'EDAHAB'}
               >
                 <span className="brand-logo" aria-hidden="true">
-                  <img src={edahabLogo} alt="" />
-                </span>
+                  <img src={edahabLogo} alt="" />               
+               </span>
                 <span className="tab-text">E-Dahab</span>
               </button>
             </div>
@@ -296,7 +422,7 @@ export default function Donate() {
               <label className="label">Full Name (optional)</label>
               <input
                 type="text"
-                placeholder="e.g., Ayaan Ali"
+                placeholder="e.g., Abdimahad Hussein Abdulle"
                 value={name}
                 onChange={e => setName(e.target.value)}
               />
@@ -322,27 +448,28 @@ export default function Donate() {
               placeholder={method === 'EVC' ? '61xxxxxxx' : '65 / 66 xxxxxxx'}
               value={phone}
               onChange={e => setPhone(e.target.value)}
+              required
             />
-            <p className="hint"><IconInfo /> You’ll receive a prompt on your phone to approve the payment.</p>
+            <p className="hint"><IconInfo /> You'll receive a prompt on your phone to approve the payment.</p>
           </div>
 
           <div className="form-row">
             <label className="label">Note (optional)</label>
             <textarea
               rows="3"
-              placeholder="Leave a message with your donation…"
+              placeholder="Leave a message with your donation..."
               value={note}
               onChange={e => setNote(e.target.value)}
             />
           </div>
 
-          {/* Terms checkbox (you had the state, adding the UI) */}
           <div className="form-row agree-row">
             <label className="agree">
               <input
                 type="checkbox"
                 checked={agree}
                 onChange={e => setAgree(e.target.checked)}
+                required
               />
               <span>I agree to the terms and understand mobile prompts may be sent to my phone.</span>
             </label>
@@ -350,11 +477,11 @@ export default function Donate() {
 
           <div className="submit-row">
             <button className="btn btn-primary sheen" type="submit" disabled={loading || !finalAmount || !agree}>
-              {loading ? 'Processing…' : `Donate ${formatMoney(finalAmount)}`}
+              {loading ? 'Processing...' : `Donate ${formatMoney(finalAmount)}`}
             </button>
             {status && (
               <div className={`status ${status}`}>
-                {status === 'pending' && <>Waiting for confirmation…</>}
+                {status === 'pending' && <>Waiting for confirmation...</>}
                 {status === 'success' && <>Payment received. Thank you! 🎉</>}
                 {status === 'failed' && <>Payment failed. Please try again.</>}
               </div>
@@ -371,10 +498,29 @@ export default function Donate() {
         {/* Right: Summary / Info */}
         <aside className="card summary reveal">
           <h3>Summary</h3>
+          {selectedProject && (
+            <div className="selected-project-summary">
+              <h4>Donating to:</h4>
+              <p>{selectedProject.title}</p>
+              <div className="project-progress-summary">
+                <div className="progress-bar">
+                  <div 
+                    className="progress-fill" 
+                    style={{ 
+                      width: `${selectedProject.goal ? Math.min(100, Math.round((Number(selectedProject.raised || 0) / Number(selectedProject.goal || 1)) * 100)) : 0}%` 
+                    }}
+                  ></div>
+                </div>
+                <div className="progress-text">
+                  ${Number(selectedProject.raised || 0).toLocaleString()} raised of ${Number(selectedProject.goal || 0).toLocaleString()}
+                </div>
+              </div>
+            </div>
+          )}
           <ul className="summary-list">
             <li><span>Amount</span><strong>{formatMoney(finalAmount || 0)}</strong></li>
             <li><span>Fee</span><strong>{formatMoney(fee || 0)}</strong></li>
-            <li className="total"><span>Total</span><strong>{formatMoney(total || 0)}</strong></li>
+            <li className="total"><span>Total</span><strong>{formatMoney(totalAmount || 0)}</strong></li>
           </ul>
 
           <div className="gateways">

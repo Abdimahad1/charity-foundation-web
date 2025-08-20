@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import '../styles/Projects.css';
 
@@ -34,6 +34,12 @@ export default function Projects() {
   const [query, setQuery] = useState('');
   const [activeCat, setActiveCat] = useState('All');
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+
+  const handleDonateClick = (projectId) => {
+    sessionStorage.setItem('selectedProjectId', projectId);
+    navigate('/donate');
+  };
 
   // Fetch projects from backend
   useEffect(() => {
@@ -41,7 +47,7 @@ export default function Projects() {
       try {
         const base = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
         const res = await axios.get(`${base}/charities`);
-        setProjects(res.data.items || res.data || []); // supports array or {items:[]}
+        setProjects(res.data.items || res.data || []);
       } catch (err) {
         console.error('Error fetching projects', err);
       } finally {
@@ -49,6 +55,21 @@ export default function Projects() {
       }
     };
     fetchData();
+  }, []);
+
+  // Refresh projects every 30 seconds to get updated raised amounts
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const base = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+        const res = await axios.get(`${base}/charities`);
+        setProjects(res.data.items || res.data || []);
+      } catch (err) {
+        console.error('Error refreshing projects', err);
+      }
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, []);
 
   // Intersection Observer for reveal animations
@@ -164,7 +185,12 @@ export default function Projects() {
                       Donate
                     </a>
                   ) : (
-                    <Link to="/donate" className="btn btn-primary sheen">Donate</Link>
+                    <button 
+                      onClick={() => handleDonateClick(p._id || p.id)} 
+                      className="btn btn-primary sheen"
+                    >
+                      Donate
+                    </button>
                   )}
                 </div>
               </div>
@@ -175,7 +201,12 @@ export default function Projects() {
         {!loading && list.length === 0 && (
           <div className="empty reveal">
             <p>No projects found. Try a different search or category.</p>
-            <Link to="/donate" className="btn btn-primary">Donate to the general fund</Link>
+            <button 
+              onClick={() => navigate('/donate')} 
+              className="btn btn-primary"
+            >
+              Donate to the general fund
+            </button>
           </div>
         )}
       </section>
