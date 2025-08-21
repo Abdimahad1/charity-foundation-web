@@ -3,6 +3,19 @@ import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import '../styles/Projects.css';
 
+/* ---------- API Configuration ---------- */
+const LOCAL_BASE =
+  (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api").replace(/\/$/, "");
+const DEPLOY_BASE =
+  (import.meta.env.VITE_API_DEPLOY_URL || "https://charity-backend-30xl.onrender.com/api").replace(/\/$/, "");
+
+// If the app runs on localhost, use local API; otherwise use deployed API.
+const isLocalHost = ["localhost", "127.0.0.1", ""].includes(window.location.hostname);
+const BASE = isLocalHost ? LOCAL_BASE : DEPLOY_BASE;
+
+// Create axios instance with base URL
+const API = axios.create({ baseURL: BASE });
+
 /* ---------- Inline icons (map categories to icons) ---------- */
 const IconBook = () => (
   <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h12a2 2 0 012 2v14H6a2 2 0 01-2-2V4zm2 2v12h10V6H6zm-2 14h14v2H4a4 4 0 01-4-4V6h2v12a2 2 0 002 2z"/></svg>
@@ -45,8 +58,7 @@ export default function Projects() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const base = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-        const res = await axios.get(`${base}/charities`);
+        const res = await API.get('/charities');
         setProjects(res.data.items || res.data || []);
       } catch (err) {
         console.error('Error fetching projects', err);
@@ -61,8 +73,7 @@ export default function Projects() {
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
-        const base = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-        const res = await axios.get(`${base}/charities`);
+        const res = await API.get('/charities');
         setProjects(res.data.items || res.data || []);
       } catch (err) {
         console.error('Error refreshing projects', err);

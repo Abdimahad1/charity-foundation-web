@@ -2,6 +2,20 @@ import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import '../styles/Donate.css';
+import Swal from 'sweetalert2';
+
+/* ---------- API Configuration ---------- */
+const LOCAL_BASE =
+  (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api").replace(/\/$/, "");
+const DEPLOY_BASE =
+  (import.meta.env.VITE_API_DEPLOY_URL || "https://charity-backend-30xl.onrender.com/api").replace(/\/$/, "");
+
+// If the app runs on localhost, use local API; otherwise use deployed API.
+const isLocalHost = ["localhost", "127.0.0.1", ""].includes(window.location.hostname);
+const BASE = isLocalHost ? LOCAL_BASE : DEPLOY_BASE;
+
+// Create axios instance with base URL
+const API = axios.create({ baseURL: BASE });
 
 /* ---------- Brand images ---------- */
 import evcLogo from '../assets/evc.png';
@@ -56,8 +70,7 @@ export default function Donate() {
     const fetchProjects = async () => {
       setProjectsLoading(true);
       try {
-        const base = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-        const res = await axios.get(`${base}/charities`);
+        const res = await API.get('/charities');
         setProjects(res.data.items || res.data || []);
       } catch (err) {
         console.error('Error fetching projects', err);
@@ -144,12 +157,10 @@ export default function Donate() {
 
   async function startPolling(id) {
     clearPolling();
-    const base = import.meta.env.VITE_API_URL || '';
     pollRef.current = setInterval(async () => {
       try {
-        const r = await fetch(`${base}/payments/status/${encodeURIComponent(id)}`);
-        if (!r.ok) return;
-        const data = await r.json();
+        const r = await API.get(`/payments/status/${encodeURIComponent(id)}`);
+        const data = r.data;
         if (data.status === 'success' || data.status === 'failed') {
           setStatus(data.status);
           clearPolling();
@@ -168,7 +179,6 @@ export default function Donate() {
     setStatus('pending');
     setTxRef(null);
 
-    const base = import.meta.env.VITE_API_URL || '';
     const payload = {
       method,
       amount: Number(finalAmount),
@@ -181,37 +191,26 @@ export default function Donate() {
     };
 
     try {
-      const res = await fetch(`${base}/payments/mobile/initiate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      const res = await API.post('/payments/mobile/initiate', payload);
 
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.message || 'Payment initiation failed');
-      }
-
-      const data = await res.json();
-
-      if (data.checkoutUrl) {
-        window.location.href = data.checkoutUrl;
+      if (res.data.checkoutUrl) {
+        window.location.href = res.data.checkoutUrl;
         return;
       }
 
-      const id = data.reference || data.txRef || data.id;
+      const id = res.data.reference || res.data.txRef || res.data.id;
       if (id) {
         setTxRef(id);
-        setStatus(data.status || 'pending');
+        setStatus(res.data.status || 'pending');
         await startPolling(id);
       } else {
-        setStatus(data.status || 'success');
+        setStatus(res.data.status || 'success');
         clearPolling();
       }
     } catch (err) {
       console.error(err);
       setStatus('failed');
-      alert(err.message);
+      alert(err.response?.data?.message || err.message || 'Payment initiation failed');
       clearPolling();
     } finally {
       setLoading(false);
@@ -252,6 +251,12 @@ export default function Donate() {
           <p className="sub reveal">
             Your contribution fuels education, healthcare, clean water, and empowerment programs.
           </p>
+          {selectedProject && (
+            <div className="charity-info reveal">
+              <strong>Donating to: {selectedProject.title}</strong>
+              <span className="location">{selectedProject.location}</span>
+            </div>
+          )}
           <div className="secure reveal">
             <span className="shield"><IconShield /></span>
             Secure mobile payments via Hormuud EVC Plus & E-Dahab
@@ -476,7 +481,19 @@ export default function Donate() {
           </div>
 
           <div className="submit-row">
-            <button className="btn btn-primary sheen" type="submit" disabled={loading || !finalAmount || !agree}>
+            <button 
+              className="btn btn-primary sheen" 
+              type="button" // Change type to button to prevent form submission
+              onClick={() => {
+                Swal.fire({
+                  title: "Donation Not Ready",
+                  text: "Sorry, the donation program is not yet implemented. We will soon do it.",
+                  icon: "info",
+                  confirmButtonText: "OK",
+                  backdrop: 'rgba(0,0,0,0.5)', // Optional: darken the background
+                });
+              }}
+            >
               {loading ? 'Processing...' : `Donate ${formatMoney(finalAmount)}`}
             </button>
             {status && (
@@ -484,7 +501,7 @@ export default function Donate() {
                 {status === 'pending' && <>Waiting for confirmation...</>}
                 {status === 'success' && <>Payment received. Thank you! 🎉</>}
                 {status === 'failed' && <>Payment failed. Please try again.</>}
-              </div>
+            </div>
             )}
           </div>
 

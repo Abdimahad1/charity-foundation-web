@@ -1,6 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import '../styles/Volunteers.css';
 
+/* ---------- API Configuration ---------- */
+const LOCAL_BASE =
+  (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api").replace(/\/$/, "");
+const DEPLOY_BASE =
+  (import.meta.env.VITE_API_DEPLOY_URL || "https://charity-backend-30xl.onrender.com/api").replace(/\/$/, "");
+
+// If the app runs on localhost, use local API; otherwise use deployed API.
+const isLocalHost = ["localhost", "127.0.0.1", ""].includes(window.location.hostname);
+const BASE = isLocalHost ? LOCAL_BASE : DEPLOY_BASE;
+
+// Create axios instance with base URL
+const API = axios.create({ baseURL: BASE });
+
 /* --------- Inline icons (no external libs) --------- */
 const IconHandsHeart = () => (
   <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12l5-5 5 5-5 5-5-5zm10 0l5-5 5 5-5 5-5-5z"/></svg>
@@ -94,7 +107,6 @@ export default function Volunteers() {
     setStatusMsg('');
 
     try {
-      const base = import.meta.env.VITE_API_URL || '';
       const formData = new FormData();
       
       // Append all form data
@@ -114,29 +126,32 @@ export default function Volunteers() {
         formData.append('cv', cv);
       }
 
-      const r = await fetch(`${base}/volunteers/apply`, {
-        method: 'POST',
-        body: formData
+      // Use the centralized API configuration
+      const response = await API.post('/volunteers/apply', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
       });
 
-      const data = await r.json();
-      if (!r.ok) throw new Error(data?.message || 'Submission failed');
+      if (response.data && response.data.success) {
+        setStatus('success');
+        setStatusMsg(response.data.message || 'Thanks! Your application has been received.');
 
-      setStatus('success');
-      setStatusMsg(data?.message || 'Thanks! Your application has been received.');
-
-      // Reset form
-      setFullName('');
-      setEmail('');
-      setPhone('');
-      setSkills('');
-      setMessage('');
-      setCv(null);
-      setInterests(['Education']);
-      setAgree(false);
+        // Reset form
+        setFullName('');
+        setEmail('');
+        setPhone('');
+        setSkills('');
+        setMessage('');
+        setCv(null);
+        setInterests(['Education']);
+        setAgree(false);
+      } else {
+        throw new Error(response.data?.message || 'Submission failed');
+      }
     } catch (err) {
       setStatus('error');
-      setStatusMsg(err.message || 'Something went wrong.');
+      setStatusMsg(err.response?.data?.message || err.message || 'Something went wrong.');
     } finally {
       setSubmitting(false);
     }
