@@ -47,6 +47,7 @@ export default function Projects() {
   const [query, setQuery] = useState('');
   const [activeCat, setActiveCat] = useState('All');
   const [loading, setLoading] = useState(true);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const navigate = useNavigate();
 
   const handleDonateClick = (projectId) => {
@@ -58,6 +59,7 @@ export default function Projects() {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        setLoading(true);
         const res = await API.get('/charities');
         setProjects(res.data.items || res.data || []);
       } catch (err) {
@@ -67,7 +69,7 @@ export default function Projects() {
       }
     };
     fetchData();
-  }, []);
+  }, [refreshTrigger]); // Added refreshTrigger as dependency
 
   // Refresh projects every 30 seconds to get updated raised amounts
   useEffect(() => {
@@ -92,6 +94,11 @@ export default function Projects() {
     els.forEach((el) => io.observe(el));
     return () => io.disconnect();
   }, [projects]);
+
+  // Function to handle search and filter
+  const handleSearchAndFilter = () => {
+    setRefreshTrigger(prev => prev + 1); // Trigger refetch
+  };
 
   const categories = useMemo(() => {
     const uniqueCats = Array.from(new Set(projects.map(p => p.category).filter(Boolean)));
@@ -124,7 +131,10 @@ export default function Projects() {
                 <button
                   key={cat}
                   className={`chip ${activeCat === cat ? 'active' : ''}`}
-                  onClick={() => setActiveCat(cat)}
+                  onClick={() => {
+                    setActiveCat(cat);
+                    handleSearchAndFilter();
+                  }}
                 >
                   {cat}
                 </button>
@@ -137,8 +147,20 @@ export default function Projects() {
                 placeholder="Search by title or location…"
                 value={query}
                 onChange={e => setQuery(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSearchAndFilter();
+                  }
+                }}
                 aria-label="Search projects"
               />
+              <button 
+                onClick={handleSearchAndFilter}
+                className="search-button"
+                aria-label="Apply search"
+              >
+                Search
+              </button>
             </div>
           </div>
         </div>
