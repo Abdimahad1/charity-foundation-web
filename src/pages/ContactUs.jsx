@@ -56,27 +56,36 @@ export default function ContactUs() {
     setStatus(null);
     setStatusMsg('');
 
-    // Normalize base so we always get exactly one /api
-    const RAW = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-    const BASE = RAW.replace(/\/+$/,''); // trim trailing slashes
-    const API = BASE.endsWith('/api') ? BASE : `${BASE}/api`;
+    // API Configuration
+    const LOCAL_BASE = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api").replace(/\/$/, "");
+    const DEPLOY_BASE = (import.meta.env.VITE_API_DEPLOY_URL || "https://charity-backend-30xl.onrender.com/api").replace(/\/$/, "");
+    const isLocalHost = ["localhost", "127.0.0.1", ""].includes(window.location.hostname);
+    const BASE = isLocalHost ? LOCAL_BASE : DEPLOY_BASE;
 
     try {
-      const res = await fetch(`${API}/contact/send`, {
+      // Send the contact form data to your backend
+      const res = await fetch(`${BASE}/contact/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          // This will trigger the email to be sent to your admin email
+          toAdmin: true,
+          recipientEmail: 'mucjisoduusho123@gmail.com' // Your email address
+        }),
       });
+      
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.message || 'Not Found');
+      
+      if (!res.ok) throw new Error(data?.message || 'Failed to send message');
 
       setStatus('ok');
-      setStatusMsg('Thanks! Your message has been sent.');
+      setStatusMsg('Thanks! Your message has been sent. We\'ll get back to you soon.');
       setForm({ name: '', email: '', phone: '', subject: '', message: '' });
     } catch (err) {
       console.error(err);
       setStatus('err');
-      setStatusMsg(err.message || 'Something went wrong.');
+      setStatusMsg(err.message || 'Something went wrong. Please try again later.');
     } finally {
       setSending(false);
     }
@@ -97,7 +106,7 @@ export default function ContactUs() {
       <section className="c-hero">
         <div className="c-hero-inner container-wide">
           <span className="badge reveal">Contact Us</span>
-          <h1 className="title reveal">We’d love to hear from you</h1>
+          <h1 className="title reveal">We'd love to hear from you</h1>
           <p className="sub reveal">
             Questions, ideas, partnership requests, or media? Send a message—our team will get back soon.
           </p>
@@ -115,28 +124,59 @@ export default function ContactUs() {
           <div className="grid-2">
             <div className="form-row">
               <label className="label">Full Name</label>
-              <input name="name" value={form.name} onChange={onChange} placeholder="e.g., Abdimahad Hussein" required />
+              <input 
+                name="name" 
+                value={form.name} 
+                onChange={onChange} 
+                placeholder="e.g., Abdimahad Hussein" 
+                required 
+              />
             </div>
             <div className="form-row">
               <label className="label">Email</label>
-              <input type="email" name="email" value={form.email} onChange={onChange} placeholder="you@email.com" required />
+              <input 
+                type="email" 
+                name="email" 
+                value={form.email} 
+                onChange={onChange} 
+                placeholder="you@email.com" 
+                required 
+              />
             </div>
           </div>
 
           <div className="grid-2">
             <div className="form-row">
               <label className="label">Phone (optional)</label>
-              <input type="tel" name="phone" value={form.phone} onChange={onChange} placeholder="61xxxxxxx" />
+              <input 
+                type="tel" 
+                name="phone" 
+                value={form.phone} 
+                onChange={onChange} 
+                placeholder="61xxxxxxx" 
+              />
             </div>
             <div className="form-row">
               <label className="label">Subject</label>
-              <input name="subject" value={form.subject} onChange={onChange} placeholder="How can we help?" />
+              <input 
+                name="subject" 
+                value={form.subject} 
+                onChange={onChange} 
+                placeholder="How can we help?" 
+              />
             </div>
           </div>
 
           <div className="form-row">
             <label className="label">Message</label>
-            <textarea rows="4" name="message" value={form.message} onChange={onChange} placeholder="Type your message…" required />
+            <textarea 
+              rows="4" 
+              name="message" 
+              value={form.message} 
+              onChange={onChange} 
+              placeholder="Type your message…" 
+              required 
+            />
           </div>
 
           <div className="submit-row">
@@ -176,7 +216,7 @@ export default function ContactUs() {
               <div className="iicon"><IconMail /></div>
               <div>
                 <h4>Email</h4>
-                <p>mohamed.abdikadirsomo@gmail.com</p>
+                <p>mucjisoduusho123@gmail.com</p>
               </div>
             </div>
 
