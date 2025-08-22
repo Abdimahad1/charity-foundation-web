@@ -6,7 +6,7 @@ import axios from "axios";
 /* ---------- Base URLs ---------- */
 const isLocalHost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
 const LOCAL_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000/api").replace(/\/$/, "");
-const DEPLOY_BASE = (import.meta.env.VITE_API_DEPLOY || "https://charity-backend-30xl.onrender.com/api").replace(/\/$/, "");
+const DEPLOY_BASE = (import.meta.env.VITE_API_DEPLOY || "https://charity-backend-c05j.onrender.com/api").replace(/\/$/, "");
 const API_BASE = import.meta.env.PROD ? DEPLOY_BASE : (isLocalHost ? LOCAL_BASE : DEPLOY_BASE);
 const API_ORIGIN = API_BASE.replace(/\/api(?:\/.*)?$/, "");
 const API = axios.create({ baseURL: API_BASE });
