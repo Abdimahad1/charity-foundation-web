@@ -128,7 +128,7 @@ export default function ContactUs() {
                 name="name" 
                 value={form.name} 
                 onChange={onChange} 
-                placeholder="e.g., Abdimahad Hussein" 
+                placeholder="e.g., John Doe" 
                 required 
               />
             </div>

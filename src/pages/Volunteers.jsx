@@ -182,7 +182,7 @@ export default function Volunteers() {
           <div className="grid-2">
             <div className="form-row">
               <label className="label"><IconUser /> Full Name</label>
-              <input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="e.g., Abdimahad Hussein" required />
+              <input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="e.g., John Doe" required />
             </div>
             <div className="form-row">
               <label className="label"><IconMail /> Email</label>
