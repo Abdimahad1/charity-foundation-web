@@ -216,7 +216,7 @@ export default function ContactUs() {
               <div className="iicon"><IconMail /></div>
               <div>
                 <h4>Email</h4>
-                <p>mucjisoduusho123@gmail.com</p>
+                <p>mohamed.abdikadirsomo@gmail.com</p>
               </div>
             </div>
 
