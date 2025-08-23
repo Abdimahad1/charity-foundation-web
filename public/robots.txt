@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://www.al-haqwelfarefoundation.org/sitemap.xml
