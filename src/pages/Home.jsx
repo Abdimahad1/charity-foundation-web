@@ -23,14 +23,19 @@ const absolutizeUploadUrl = (u) => {
   if (/^\/uploads\//i.test(s)) return `${API_ORIGIN}${s}`;
   return `${API_ORIGIN}${s}`;
 };
-const widths = [320, 640, 960, 1280, 1600, 1920, 2560];
-const addParam = (url, key, value) => {
-  if (!url) return "";
-  const sep = url.includes("?") ? "&" : "?";
-  return `${url}${sep}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+
+// Responsive image helper functions
+const responsiveUrl = (url, width, format = 'webp') => {
+  if (!url) return '';
+  const baseUrl = url.includes('?') ? url.split('?')[0] : url;
+  return `${baseUrl}?width=${width}&format=${format}`;
 };
-const buildSrcSet = (url) => widths.map((w) => `${addParam(url, "w", w)} ${w}w`).join(", ");
-const toHD = (url) => addParam(url, "w", 1920);
+
+const buildSrcSet = (url) => {
+  if (!url) return '';
+  const widths = [320, 480, 640, 768, 1024, 1280, 1536, 1920];
+  return widths.map(w => `${responsiveUrl(url, w)} ${w}w`).join(', ');
+};
 
 const pickSlideSrc = (s) => {
   if (s?.src) return absolutizeUploadUrl(s.src);
@@ -165,9 +170,9 @@ export default function Home() {
           const base = pickSlideSrc(s);
           return {
             id: s?._id || s?.id || i,
-            src: toHD(base),
+            src: responsiveUrl(base, 1024),
             srcSet: buildSrcSet(base),
-            sizes: "(max-width: 960px) 100vw, 100vw",
+            sizes: "(max-width: 768px) 100vw, 50vw",
             alt: (s?.alt && String(s.alt)) || "Slide image",
             title: (s?.title && String(s.title)) || "",
             subtitle: (s?.subtitle && String(s.subtitle)) || "",
@@ -205,7 +210,7 @@ export default function Home() {
           return {
             id,
             title,
-            cover: toHD(coverBase),
+            cover: responsiveUrl(coverBase, 600),
             coverSet: buildSrcSet(coverBase),
             category,
             location,
@@ -419,16 +424,19 @@ export default function Home() {
                 <article key={ev.id} className="event-card hover-pop">
                   <div className="cover" aria-hidden="true">
                     {ev.cover ? (
-                      <img
-                        className="cover-img"
-                        src={ev.cover}
-                        srcSet={ev.coverSet}
-                        sizes="(max-width:1100px) 50vw, 33vw"
-                        alt={ev.title}
-                        loading="lazy"
-                        decoding="async"
-                        onError={(e) => (e.currentTarget.style.visibility = "hidden")}
-                      />
+                      <picture>
+                        <source srcSet={ev.coverSet} type="image/webp" />
+                        <img
+                          className="cover-img"
+                          src={ev.cover}
+                          srcSet={ev.coverSet}
+                          sizes="(max-width:1100px) 50vw, 33vw"
+                          alt={ev.title}
+                          loading="lazy"
+                          decoding="async"
+                          onError={(e) => (e.currentTarget.style.visibility = "hidden")}
+                        />
+                      </picture>
                     ) : null}
                   </div>
                   <div className="meta">
