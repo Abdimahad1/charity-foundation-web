@@ -11,7 +11,7 @@ const API_BASE = import.meta.env.PROD ? DEPLOY_BASE : (isLocalHost ? LOCAL_BASE 
 const API_ORIGIN = API_BASE.replace(/\/api(?:\/.*)?$/, "");
 const API = axios.create({ baseURL: API_BASE });
 
-/* ---------- URL helpers ---------- */
+/* ---------- URL helpers (variant-aware) ---------- */
 const absolutizeUploadUrl = (u) => {
   if (!u) return "";
   let s = String(u).trim().replace(/\\/g, "/");
@@ -19,22 +19,30 @@ const absolutizeUploadUrl = (u) => {
   if (!s.startsWith("/")) s = `/${s}`;
   s = s.replace(/^\/api(?=\/uploads\/)/i, "");
   if (/^\/images\//i.test(s)) s = `/uploads${s}`;
-  if (/^\/[^/]+\.(jpg|jpeg|png|gif|webp)$/i.test(s)) s = `/uploads/images${s}`;
+  if (/^\/[^/]+\.(jpg|jpeg|png|gif|webp|avif)$/i.test(s)) s = `/uploads/images${s}`;
   if (/^\/uploads\//i.test(s)) return `${API_ORIGIN}${s}`;
   return `${API_ORIGIN}${s}`;
 };
 
-// Responsive image helper functions
-const responsiveUrl = (url, width, format = 'webp') => {
-  if (!url) return '';
-  const baseUrl = url.includes('?') ? url.split('?')[0] : url;
-  return `${baseUrl}?width=${width}&format=${format}`;
+const isBlobLike = (u = "") => /^blob:|^data:/i.test(String(u));
+
+const toVariantUrl = (absUrl) => {
+  // Turn .../uploads/images/<file> -> .../api/upload/variant/<file>
+  const m = absUrl.match(/\/uploads\/images\/([^/?#]+)/i);
+  return m ? `${API_BASE}/upload/variant/${m[1]}` : absUrl.split("?")[0];
+};
+
+const responsiveUrl = (url, width) => {
+  if (!url || isBlobLike(url)) return url || "";
+  const abs = absolutizeUploadUrl(url);
+  const variant = toVariantUrl(abs);
+  return `${variant}?width=${width}`; // backend returns webp
 };
 
 const buildSrcSet = (url) => {
-  if (!url) return '';
+  if (!url || isBlobLike(url)) return "";
   const widths = [320, 480, 640, 768, 1024, 1280, 1536, 1920];
-  return widths.map(w => `${responsiveUrl(url, w)} ${w}w`).join(', ');
+  return widths.map((w) => `${responsiveUrl(url, w)} ${w}w`).join(", ");
 };
 
 const pickSlideSrc = (s) => {
@@ -167,9 +175,12 @@ export default function Home() {
           .slice(0, 3);
 
         const normalized = published.map((s, i) => {
-          const base = pickSlideSrc(s);
+          const base = pickSlideSrc(s);               // absolute /uploads/... url
+          const orig = absolutizeUploadUrl(base).split("?")[0];
           return {
             id: s?._id || s?.id || i,
+            base,                                     // keep for srcset rebuilds if needed
+            orig,                                     // fallback (no query)
             src: responsiveUrl(base, 1024),
             srcSet: buildSrcSet(base),
             sizes: "(max-width: 768px) 100vw, 50vw",
@@ -203,6 +214,7 @@ export default function Home() {
           const id = e?._id || e?.id || i;
           const title = String(e?.title || e?.name || "Untitled");
           const coverBase = pickEventCover(e);
+          const coverOrig = absolutizeUploadUrl(coverBase).split("?")[0];
           const category = (e?.category && (e.category.name || e.category)) || "Event";
           const location = e?.location || e?.city || "";
           const when = e?.date || e?.publishedAt || e?.createdAt || null;
@@ -212,6 +224,7 @@ export default function Home() {
             title,
             cover: responsiveUrl(coverBase, 600),
             coverSet: buildSrcSet(coverBase),
+            coverOrig,
             category,
             location,
             whenLabel: fmtDate(when),
@@ -232,7 +245,7 @@ export default function Home() {
   /* UI helpers */
   const showHeroText = !loadingSlides && slides.length > 0;
   const current = slides[currentSlide] || {};
-  
+
   useEffect(() => {
     const els = document.querySelectorAll(".reveal");
     const io = new IntersectionObserver(
@@ -290,8 +303,8 @@ export default function Home() {
                 return (
                   <div key={img.id ?? i} className={`hero-image-wrapper ${i === currentSlide ? "active" : ""}`}>
                     <picture>
-                      <source 
-                        srcSet={img.srcSet} 
+                      <source
+                        srcSet={img.srcSet}
                         sizes={img.sizes}
                         type="image/webp"
                       />
@@ -305,6 +318,13 @@ export default function Home() {
                         fetchPriority={eager ? "high" : "low"}
                         decoding="async"
                         onError={(e) => {
+                          // Fallback to original file (no query) once
+                          const orig = img.orig || (img.src || "").split("?")[0];
+                          if (orig && e.currentTarget.src !== orig) {
+                            e.currentTarget.src = orig;
+                            e.currentTarget.srcset = "";
+                            return;
+                          }
                           e.currentTarget.classList.add("hero-image--error");
                           console.error("Failed to load hero image:", img.src);
                         }}
@@ -434,7 +454,15 @@ export default function Home() {
                           alt={ev.title}
                           loading="lazy"
                           decoding="async"
-                          onError={(e) => (e.currentTarget.style.visibility = "hidden")}
+                          onError={(e) => {
+                            const orig = ev.coverOrig || (ev.cover || "").split("?")[0];
+                            if (orig && e.currentTarget.src !== orig) {
+                              e.currentTarget.src = orig;
+                              e.currentTarget.srcset = "";
+                              return;
+                            }
+                            e.currentTarget.style.visibility = "hidden";
+                          }}
                         />
                       </picture>
                     ) : null}
