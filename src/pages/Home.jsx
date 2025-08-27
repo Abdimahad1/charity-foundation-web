@@ -14,46 +14,22 @@ const DEPLOY_BASE =
     "https://charity-backend-c05j.onrender.com/api").replace(/\/$/, "");
 const isLocalHost = ["localhost", "127.0.0.1", ""].includes(window.location.hostname);
 const API_BASE = isLocalHost ? LOCAL_BASE : DEPLOY_BASE;
-const API_ORIGIN = API_BASE.replace(/\/api(?:\/.*)?$/, "");
 const API = axios.create({ baseURL: API_BASE });
 
-/* ---------- URL helpers (variant-aware) ---------- */
-const absolutizeUploadUrl = (u) => {
-  if (!u) return "";
-  let s = String(u).trim().replace(/\\/g, "/");
-  if (/^https?:\/\//i.test(s) || /^data:|^blob:/i.test(s)) return s;
-  if (!s.startsWith("/")) s = `/${s}`;
-  // normalize common dev paths
-  s = s.replace(/^\/api(?=\/uploads\/)/i, "");
-  if (/^\/images\//i.test(s)) s = `/uploads${s}`;
-  if (/^\/[^/]+\.(jpg|jpeg|png|gif|webp|avif)$/i.test(s)) s = `/uploads/images${s}`;
-  if (/^\/uploads\//i.test(s)) return `${API_ORIGIN}${s}`;
-  return `${API_ORIGIN}${s}`;
-};
-
+/* ---------- Simplified URL helpers (like charity page) ---------- */
 const isBlobLike = (u = "") => /^blob:|^data:/i.test(String(u));
 
-const toVariantUrl = (absUrl) => {
-  // Transform .../uploads/images/<file> -> .../api/upload/variant/<file>
-  const m = absUrl.match(/\/uploads\/images\/([^/?#]+)/i);
-  return m ? `${API_BASE}/upload/variant/${m[1]}` : absUrl.split("?")[0];
+// Simple URL formatter like in charity page
+const formatImageUrl = (url) => {
+  if (!url) return '';
+  if (url.startsWith('http') || isBlobLike(url)) return url;
+  if (url.startsWith('/uploads')) return `${API_BASE.replace('/api', '')}${url}`;
+  return `${API_BASE.replace('/api', '')}/uploads/${url}`;
 };
 
-const responsiveUrl = (url, width) => {
-  if (!url || isBlobLike(url)) return url || "";
-  const abs = absolutizeUploadUrl(url);
-  const variant = toVariantUrl(abs);
-  return `${variant}?width=${width}`; // backend returns optimized (e.g., webp)
-};
-
-const buildSrcSet = (url) => {
-  if (!url || isBlobLike(url)) return "";
-  const widths = [320, 480, 640, 768, 1024, 1280, 1536, 1920];
-  return widths.map((w) => `${responsiveUrl(url, w)} ${w}w`).join(", ");
-};
-
+// Simplified slide source picker
 const pickSlideSrc = (s) => {
-  if (s?.src) return absolutizeUploadUrl(s.src);
+  if (s?.src) return formatImageUrl(s.src);
   const img0 = Array.isArray(s?.images) ? s.images[0] : undefined;
   const img0Url = (img0 && typeof img0 === "object") ? (img0.url ?? img0.src ?? img0.path) : img0;
   const candidate =
@@ -62,11 +38,12 @@ const pickSlideSrc = (s) => {
     s?.file?.url ??
     img0Url ??
     (s?.filename ? `/uploads/images/${s.filename}` : "");
-  return absolutizeUploadUrl(candidate);
+  return formatImageUrl(candidate);
 };
 
+// Simplified event cover picker
 const pickEventCover = (e) => {
-  if (e?.coverImage) return absolutizeUploadUrl(e.coverImage);
+  if (e?.coverImage) return formatImageUrl(e.coverImage);
   const img0 = Array.isArray(e?.images) ? e.images[0] : undefined;
   const img0Url = (img0 && typeof img0 === "object") ? (img0.url ?? img0.src ?? img0.path) : img0;
   const candidate =
@@ -74,7 +51,7 @@ const pickEventCover = (e) => {
     e?.image ??
     img0Url ??
     (e?.filename ? `/uploads/images/${e.filename}` : "");
-  return absolutizeUploadUrl(candidate);
+  return formatImageUrl(candidate);
 };
 
 /* ---------- Icons ---------- */
@@ -183,14 +160,9 @@ export default function Home() {
 
         const normalized = published.map((s, i) => {
           const base = pickSlideSrc(s); // absolute /uploads/... url
-          const orig = absolutizeUploadUrl(base).split("?")[0];
           return {
             id: s?._id || s?.id || i,
-            base,
-            orig,
-            src: responsiveUrl(base, 1024),
-            srcSet: buildSrcSet(base),
-            sizes: "(max-width: 768px) 100vw, 50vw",
+            src: formatImageUrl(base),
             alt: (s?.alt && String(s.alt)) || "Slide image",
             title: (s?.title && String(s.title)) || "",
             subtitle: (s?.subtitle && String(s.subtitle)) || "",
@@ -221,7 +193,6 @@ export default function Home() {
           const id = e?._id || e?.id || i;
           const title = String(e?.title || e?.name || "Untitled");
           const coverBase = pickEventCover(e);
-          const coverOrig = absolutizeUploadUrl(coverBase).split("?")[0];
           const category = (e?.category && (e.category.name || e.category)) || "Event";
           const location = e?.location || e?.city || "";
           const when = e?.date || e?.publishedAt || e?.createdAt || null;
@@ -229,9 +200,7 @@ export default function Home() {
           return {
             id,
             title,
-            cover: responsiveUrl(coverBase, 600),
-            coverSet: buildSrcSet(coverBase),
-            coverOrig,
+            cover: formatImageUrl(coverBase),
             category,
             location,
             whenLabel: fmtDate(when),
@@ -309,35 +278,27 @@ export default function Home() {
                 const eager = i === 0;
                 return (
                   <div key={img.id ?? i} className={`hero-image-wrapper ${i === currentSlide ? "active" : ""}`}>
-                    <picture>
-                      <source
-                        srcSet={img.srcSet}
-                        sizes={img.sizes}
-                        type="image/webp"
-                      />
-                      <img
-                        src={img.src}
-                        srcSet={img.srcSet}
-                        sizes={img.sizes}
-                        alt={img.alt?.trim() || "Homepage slide"}
-                        className="hero-image"
-                        loading={eager ? "eager" : "lazy"}
-                        fetchPriority={eager ? "high" : "low"}
-                        decoding="async"
-                        onError={(e) => {
-                          // Fallback to original file (no query) once
-                          const orig = img.orig || (img.src || "").split("?")[0];
-                          if (orig && e.currentTarget.src !== orig) {
-                            e.currentTarget.src = orig;
-                            e.currentTarget.srcset = "";
-                            return;
-                          }
-                          e.currentTarget.classList.add("hero-image--error");
-                          e.currentTarget.style.background = "var(--img-fallback, #eaeff2)";
-                          console.error("Failed to load hero image:", img.src);
-                        }}
-                      />
-                    </picture>
+                    <img
+                      src={img.src}
+                      alt={img.alt?.trim() || "Homepage slide"}
+                      className="hero-image"
+                      loading={eager ? "eager" : "lazy"}
+                      fetchPriority={eager ? "high" : "low"}
+                      decoding="async"
+                      onError={(e) => {
+                        // Try direct URL if the formatted one fails
+                        const directUrl = img.src.startsWith('/') 
+                          ? `${API_BASE.replace('/api', '')}${img.src}`
+                          : img.src;
+                        if (directUrl && e.currentTarget.src !== directUrl) {
+                          e.currentTarget.src = directUrl;
+                          return;
+                        }
+                        e.currentTarget.classList.add("hero-image--error");
+                        e.currentTarget.style.background = "var(--img-fallback, #eaeff2)";
+                        console.error("Failed to load hero image:", img.src);
+                      }}
+                    />
                   </div>
                 );
               })}
@@ -452,27 +413,24 @@ export default function Home() {
                 <article key={ev.id} className="event-card hover-pop">
                   <div className="cover" aria-hidden="true">
                     {ev.cover ? (
-                      <picture>
-                        <source srcSet={ev.coverSet} type="image/webp" />
-                        <img
-                          className="cover-img"
-                          src={ev.cover}
-                          srcSet={ev.coverSet}
-                          sizes="(max-width:1100px) 50vw, 33vw"
-                          alt={ev.title}
-                          loading="lazy"
-                          decoding="async"
-                          onError={(e) => {
-                            const orig = ev.coverOrig || (ev.cover || "").split("?")[0];
-                            if (orig && e.currentTarget.src !== orig) {
-                              e.currentTarget.src = orig;
-                              e.currentTarget.srcset = "";
-                              return;
-                            }
-                            e.currentTarget.style.visibility = "hidden";
-                          }}
-                        />
-                      </picture>
+                      <img
+                        className="cover-img"
+                        src={ev.cover}
+                        alt={ev.title}
+                        loading="lazy"
+                        decoding="async"
+                        onError={(e) => {
+                          // Try direct URL if the formatted one fails
+                          const directUrl = ev.cover.startsWith('/') 
+                            ? `${API_BASE.replace('/api', '')}${ev.cover}`
+                            : ev.cover;
+                          if (directUrl && e.currentTarget.src !== directUrl) {
+                            e.currentTarget.src = directUrl;
+                            return;
+                          }
+                          e.currentTarget.style.visibility = "hidden";
+                        }}
+                      />
                     ) : null}
                   </div>
                   <div className="meta">
@@ -626,7 +584,6 @@ export default function Home() {
             <span>© {new Date().getFullYear()} CharityHope. All rights reserved.</span>
             <div className="legal-links">
               <Link to="/privacy">Privacy</Link>
-              <Link to="/terms">Terms</Link>
               <Link to="/donor-policy">Donor Policy</Link>
             </div>
           </div>
