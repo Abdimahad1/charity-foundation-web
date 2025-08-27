@@ -3,11 +3,17 @@ import "../styles/Home.css";
 import { Link } from "react-router-dom";
 import axios from "axios";
 
-/* ---------- Base URLs ---------- */
-const isLocalHost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
-const LOCAL_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000/api").replace(/\/$/, "");
-const DEPLOY_BASE = (import.meta.env.VITE_API_DEPLOY || "https://charity-backend-c05j.onrender.com/api").replace(/\/$/, "");
-const API_BASE = import.meta.env.PROD ? DEPLOY_BASE : (isLocalHost ? LOCAL_BASE : DEPLOY_BASE);
+/* ---------- API base detection (mirrors Projects.jsx) ---------- */
+const LOCAL_BASE =
+  (import.meta.env.VITE_API_URL ||
+    import.meta.env.VITE_API_BASE_URL ||
+    "http://localhost:5000/api").replace(/\/$/, "");
+const DEPLOY_BASE =
+  (import.meta.env.VITE_API_DEPLOY_URL ||
+    import.meta.env.VITE_API_DEPLOY ||
+    "https://charity-backend-c05j.onrender.com/api").replace(/\/$/, "");
+const isLocalHost = ["localhost", "127.0.0.1", ""].includes(window.location.hostname);
+const API_BASE = isLocalHost ? LOCAL_BASE : DEPLOY_BASE;
 const API_ORIGIN = API_BASE.replace(/\/api(?:\/.*)?$/, "");
 const API = axios.create({ baseURL: API_BASE });
 
@@ -17,6 +23,7 @@ const absolutizeUploadUrl = (u) => {
   let s = String(u).trim().replace(/\\/g, "/");
   if (/^https?:\/\//i.test(s) || /^data:|^blob:/i.test(s)) return s;
   if (!s.startsWith("/")) s = `/${s}`;
+  // normalize common dev paths
   s = s.replace(/^\/api(?=\/uploads\/)/i, "");
   if (/^\/images\//i.test(s)) s = `/uploads${s}`;
   if (/^\/[^/]+\.(jpg|jpeg|png|gif|webp|avif)$/i.test(s)) s = `/uploads/images${s}`;
@@ -27,7 +34,7 @@ const absolutizeUploadUrl = (u) => {
 const isBlobLike = (u = "") => /^blob:|^data:/i.test(String(u));
 
 const toVariantUrl = (absUrl) => {
-  // Turn .../uploads/images/<file> -> .../api/upload/variant/<file>
+  // Transform .../uploads/images/<file> -> .../api/upload/variant/<file>
   const m = absUrl.match(/\/uploads\/images\/([^/?#]+)/i);
   return m ? `${API_BASE}/upload/variant/${m[1]}` : absUrl.split("?")[0];
 };
@@ -36,7 +43,7 @@ const responsiveUrl = (url, width) => {
   if (!url || isBlobLike(url)) return url || "";
   const abs = absolutizeUploadUrl(url);
   const variant = toVariantUrl(abs);
-  return `${variant}?width=${width}`; // backend returns webp
+  return `${variant}?width=${width}`; // backend returns optimized (e.g., webp)
 };
 
 const buildSrcSet = (url) => {
@@ -175,12 +182,12 @@ export default function Home() {
           .slice(0, 3);
 
         const normalized = published.map((s, i) => {
-          const base = pickSlideSrc(s);               // absolute /uploads/... url
+          const base = pickSlideSrc(s); // absolute /uploads/... url
           const orig = absolutizeUploadUrl(base).split("?")[0];
           return {
             id: s?._id || s?.id || i,
-            base,                                     // keep for srcset rebuilds if needed
-            orig,                                     // fallback (no query)
+            base,
+            orig,
             src: responsiveUrl(base, 1024),
             srcSet: buildSrcSet(base),
             sizes: "(max-width: 768px) 100vw, 50vw",
@@ -279,7 +286,7 @@ export default function Home() {
   const onSubscribe = (e) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
-    const email = form.get("email")?.toString().trim();
+    const email = form.get("email");
     if (!email) return;
     alert(`Thanks! We'll keep you updated at ${email}`);
     e.currentTarget.reset();
@@ -326,6 +333,7 @@ export default function Home() {
                             return;
                           }
                           e.currentTarget.classList.add("hero-image--error");
+                          e.currentTarget.style.background = "var(--img-fallback, #eaeff2)";
                           console.error("Failed to load hero image:", img.src);
                         }}
                       />
