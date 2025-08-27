@@ -11,7 +11,7 @@ const API_BASE = import.meta.env.PROD ? DEPLOY_BASE : (isLocalHost ? LOCAL_BASE 
 const API_ORIGIN = API_BASE.replace(/\/api(?:\/.*)?$/, "");
 const API = axios.create({ baseURL: API_BASE });
 
-/* ---------- URL helpers (SIMPLIFIED) ---------- */
+/* ---------- URL helpers (variant-aware) ---------- */
 const absolutizeUploadUrl = (u) => {
   if (!u) return "";
   let s = String(u).trim().replace(/\\/g, "/");
@@ -26,18 +26,23 @@ const absolutizeUploadUrl = (u) => {
 
 const isBlobLike = (u = "") => /^blob:|^data:/i.test(String(u));
 
-// SIMPLIFIED: Use direct image URLs instead of variant endpoint
-const responsiveUrl = (url, width) => {
-  if (!url || isBlobLike(url)) return url || '';
-  return absolutizeUploadUrl(url);
+const toVariantUrl = (absUrl) => {
+  // Turn .../uploads/images/<file> -> .../api/upload/variant/<file>
+  const m = absUrl.match(/\/uploads\/images\/([^/?#]+)/i);
+  return m ? `${API_BASE}/upload/variant/${m[1]}` : absUrl.split("?")[0];
 };
 
-// SIMPLIFIED: Build srcset with the same URL for all widths
-const buildSrcSet = (url) => {
-  if (!url || isBlobLike(url)) return '';
+const responsiveUrl = (url, width) => {
+  if (!url || isBlobLike(url)) return url || "";
   const abs = absolutizeUploadUrl(url);
-  // Return the same URL for all widths (browser will handle responsive images)
-  return `${abs} 320w, ${abs} 480w, ${abs} 640w, ${abs} 768w, ${abs} 1024w, ${abs} 1280w, ${abs} 1536w, ${abs} 1920w`;
+  const variant = toVariantUrl(abs);
+  return `${variant}?width=${width}`; // backend returns webp
+};
+
+const buildSrcSet = (url) => {
+  if (!url || isBlobLike(url)) return "";
+  const widths = [320, 480, 640, 768, 1024, 1280, 1536, 1920];
+  return widths.map((w) => `${responsiveUrl(url, w)} ${w}w`).join(", ");
 };
 
 const pickSlideSrc = (s) => {
