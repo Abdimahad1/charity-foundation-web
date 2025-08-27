@@ -584,6 +584,7 @@ export default function Home() {
             <span>© {new Date().getFullYear()} CharityHope. All rights reserved.</span>
             <div className="legal-links">
               <Link to="/privacy">Privacy</Link>
+              <Link to="/terms">Terms</Link>
               <Link to="/donor-policy">Donor Policy</Link>
             </div>
           </div>
