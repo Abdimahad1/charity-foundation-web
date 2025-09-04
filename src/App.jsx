@@ -9,6 +9,8 @@ import Projects from './pages/Projects';
 import Donate from './pages/Donate';
 import Volunteers from './pages/Volunteers';
 import ContactUs from './pages/ContactUs';
+import DetailInfo from "./pages/DetailInfo";
+
 
 function App() {
   return (
@@ -23,7 +25,8 @@ function App() {
         <Route path="/donate" element={<Donate />} />
         <Route path="/volunteers" element={<Volunteers />} />
         <Route path="/contact" element={<ContactUs />} />
-      </Routes>
+        <Route path="/events/:id" element={<DetailInfo />} />
+        </Routes>
     </>
   );
 }

@@ -8,29 +8,52 @@ const LOCAL_BASE =
   (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api").replace(/\/$/, "");
 const DEPLOY_BASE =
   (import.meta.env.VITE_API_DEPLOY_URL || "https://charity-backend-c05j.onrender.com/api").replace(/\/$/, "");
-
-// If the app runs on localhost, use local API; otherwise use deployed API.
 const isLocalHost = ["localhost", "127.0.0.1", ""].includes(window.location.hostname);
 const BASE = isLocalHost ? LOCAL_BASE : DEPLOY_BASE;
-
-// Create axios instance with base URL
 const API = axios.create({ baseURL: BASE });
 
-/* ---------- Inline icons (map categories to icons) ---------- */
+/* ---------- Inline icons ---------- */
 const IconBook = () => (
-  <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h12a2 2 0 012 2v14H6a2 2 0 01-2-2V4zm2 2v12h10V6H6zm-2 14h14v2H4a4 4 0 01-4-4V6h2v12a2 2 0 002 2z"/></svg>
+  <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M4 4h12a2 2 0 012 2v14H6a2 2 0 01-2-2V4zm2 2v12h10V6H6zm-2 14h14v2H4a4 4 0 01-4-4V6h2v12a2 2 0 002 2z"/>
+  </svg>
 );
 const IconHealth = () => (
-  <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16.5 3c-1.74 0-3.41.81-4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5 2 14.54 11.5 21 12 21s10-6.46 10-12.5C22 5.42 19.58 3 16.5 3z"/></svg>
+  <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M16.5 3c-1.74 0-3.41.81-4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5 2 14.54 11.5 21 12 21s10-6.46 10-12.5C22 5.42 19.58 3 16.5 3z"/>
+  </svg>
 );
 const IconWater = () => (
-  <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2S5 9 5 13.5 8.58 21 12 21s7-3.13 7-7.5S12 2 12 2zm0 17c-2.49 0-4.5-2.02-4.5-4.5S9.51 10 12 10s4.5 2.02 4.5 4.5S14.49 19 12 19z"/></svg>
+  <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M12 2S5 9 5 13.5 8.58 21 12 21s7-3.13 7-7.5S12 2 12 2zm0 17c-2.49 0-4.5-2.02-4.5-4.5S9.51 10 12 10s4.5 2.02 4.5 4.5S14.49 19 12 19z"/>
+  </svg>
 );
 const IconFood = () => (
-  <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 9h2v12h-2zM5 9h2v12H5zM19 9h2v12h-2zM7 6a5 5 0 1110 0v3H7V6z"/></svg>
+  <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M11 9h2v12h-2zM5 9h2v12H5zM19 9h2v12h-2zM7 6a5 5 0 1110 0v3H7V6z"/>
+  </svg>
 );
 const IconWomen = () => (
-  <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a5 5 0 110 10 5 5 0 010-10zm-1 11h2v3h3v2h-3v3h-2v-3H8v-2h3v-3z"/></svg>
+  <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M12 2a5 5 0 110 10 5 5 0 010-10zm-1 11h2v3h3v2h-3v3h-2v-3H8v-2h3v-3z"/>
+  </svg>
+);
+
+/* meta icons */
+const IconTarget = () => (
+  <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M12 2a10 10 0 1010 10h-2A8 8 0 1112 4V2zm0 4a6 6 0 106 6h-2a4 4 0 11-4-4V6zm1-4h-2v6h2V2z"/>
+  </svg>
+);
+const IconCoin = () => (
+  <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M12 2C6.48 2 2 4.69 2 8v8c0 3.31 4.48 6 10 6s10-2.69 10-6V8c0-3.31-4.48-6-10-6zm0 2c4.41 0 8 .9 8 2s-3.59 2-8 2S4 7.1 4 6s3.59-2 8-2zm0 16c-4.41 0-8-.9-8-2V9.87C5.35 11.18 8.49 12 12 12s6.65-.82 8-2.13V18c0 1.1-3.59 2-8 2z"/>
+  </svg>
+);
+const IconMapPin = () => (
+  <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M12 2a7 7 0 00-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 00-7-7zm0 9a2 2 0 110-4 2 2 0 010 4z"/>
+  </svg>
 );
 
 /* Map category names to icons + colors */
@@ -55,7 +78,6 @@ export default function Projects() {
     navigate('/donate');
   };
 
-  // Fetch projects from backend
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -69,9 +91,8 @@ export default function Projects() {
       }
     };
     fetchData();
-  }, [refreshTrigger]); // Added refreshTrigger as dependency
+  }, [refreshTrigger]);
 
-  // Refresh projects every 30 seconds to get updated raised amounts
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
@@ -81,11 +102,9 @@ export default function Projects() {
         console.error('Error refreshing projects', err);
       }
     }, 30000);
-
     return () => clearInterval(interval);
   }, []);
 
-  // Intersection Observer for reveal animations
   useEffect(() => {
     const els = document.querySelectorAll('.reveal');
     const io = new IntersectionObserver((entries) => {
@@ -95,10 +114,7 @@ export default function Projects() {
     return () => io.disconnect();
   }, [projects]);
 
-  // Function to handle search and filter
-  const handleSearchAndFilter = () => {
-    setRefreshTrigger(prev => prev + 1); // Trigger refetch
-  };
+  const handleSearchAndFilter = () => setRefreshTrigger(prev => prev + 1);
 
   const categories = useMemo(() => {
     const uniqueCats = Array.from(new Set(projects.map(p => p.category).filter(Boolean)));
@@ -119,7 +135,7 @@ export default function Projects() {
 
   return (
     <main className="projects">
-      {/* Hero / header */}
+      {/* Header */}
       <section className="projects-hero">
         <div className="projects-hero-inner container-wide">
           <h1 className="title reveal">Projects & Causes</h1>
@@ -147,18 +163,10 @@ export default function Projects() {
                 placeholder="Search by title or location…"
                 value={query}
                 onChange={e => setQuery(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    handleSearchAndFilter();
-                  }
-                }}
+                onKeyPress={(e) => { if (e.key === 'Enter') handleSearchAndFilter(); }}
                 aria-label="Search projects"
               />
-              <button 
-                onClick={handleSearchAndFilter}
-                className="search-button"
-                aria-label="Apply search"
-              >
+              <button onClick={handleSearchAndFilter} className="search-button" aria-label="Apply search">
                 Search
               </button>
             </div>
@@ -172,43 +180,66 @@ export default function Projects() {
 
         {!loading && list.map(p => {
           const { icon, color } = categoryMap[p.category] || {};
-          const pct = p.goal ? Math.min(100, Math.round((Number(p.raised || 0) / Number(p.goal || 1)) * 100)) : 0;
+          const raised = Number(p.raised || 0);
+          const goal = Number(p.goal || 0);
+          const pct = goal ? Math.min(100, Math.round((raised / goal) * 100)) : 0;
 
           return (
-            <article key={p._id || p.id} className={`card card-photo reveal hover-pop ${color || ''}`}>
-              {/* HD image; keeps quality with object-fit + no filters; inherits rounded corners */}
-              {p.cover && (
-                <img
-                  className="card-img"
-                  src={p.cover}
-                  alt={p.title}
-                  loading="lazy"
-                  decoding="async"
-                  sizes="(max-width: 560px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                />
-              )}
+            <article key={p._id || p.id} className={`card card-project reveal hover-pop ${color || ''}`}>
+              {/* Media */}
+              <div className="card-media" aria-hidden={!p.cover}>
+                {p.cover ? (
+                  <img
+                    className="card-img"
+                    src={p.cover}
+                    alt={p.title}
+                    loading="lazy"
+                    decoding="async"
+                    sizes="(max-width: 560px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                ) : (
+                  <div className="card-media-fallback">Project</div>
+                )}
 
-              {/* Aqua glass panel */}
-              <div className="info-panel aqua">
-                <div className="topline">
-                  <div className={`badge ${color || ''}`}>{p.category}</div>
-                  <span className="location">{p.location}</span>
+                {/* category badge over corner */}
+                <div className="badge-row">
+                  <span className={`badge ${color || ''}`}>{p.category || 'Project'}</span>
                 </div>
+              </div>
 
+              {/* Body */}
+              <div className="card-body">
                 <div className="title-row">
                   <div className={`icon-wrap ${color || ''}`}>{icon}</div>
-                  <h3>{p.title}</h3>
+                  <h3 className="card-title">{p.title}</h3>
                 </div>
 
-                <p className="excerpt">{p.excerpt}</p>
+                {p.excerpt && <p className="excerpt">{p.excerpt}</p>}
 
                 <div className="progress">
                   <div className="bar"><span className={`fill ${color || ''}`} style={{ width: `${pct}%` }} /></div>
                   <div className="legend">
-                    <span className="raised">${Number(p.raised || 0).toLocaleString()}</span>
-                    <span className="goal">of ${Number(p.goal || 0).toLocaleString()}</span>
+                    <span className="raised">${raised.toLocaleString()}</span>
+                    <span className="goal">of ${goal.toLocaleString()}</span>
                     <span className="pct">{pct}%</span>
+                  </div>
+                </div>
+
+                <div className="meta-row">
+                  {p.location && (
+                    <div className="meta">
+                      <span className="meta-ic"><IconMapPin /></span>
+                      <span>{p.location}</span>
+                    </div>
+                  )}
+                  <div className="meta">
+                    <span className="meta-ic"><IconCoin /></span>
+                    <span>${raised.toLocaleString()}</span>
+                  </div>
+                  <div className="meta">
+                    <span className="meta-ic"><IconTarget /></span>
+                    <span>${goal.toLocaleString()}</span>
                   </div>
                 </div>
 
@@ -218,10 +249,7 @@ export default function Projects() {
                       Donate
                     </a>
                   ) : (
-                    <button 
-                      onClick={() => handleDonateClick(p._id || p.id)} 
-                      className="btn btn-primary sheen"
-                    >
+                    <button onClick={() => handleDonateClick(p._id || p.id)} className="btn btn-primary sheen">
                       Donate
                     </button>
                   )}
@@ -234,10 +262,7 @@ export default function Projects() {
         {!loading && list.length === 0 && (
           <div className="empty reveal">
             <p>No projects found. Try a different search or category.</p>
-            <button 
-              onClick={() => navigate('/donate')} 
-              className="btn btn-primary"
-            >
+            <button onClick={() => navigate('/donate')} className="btn btn-primary">
               Donate to the general fund
             </button>
           </div>

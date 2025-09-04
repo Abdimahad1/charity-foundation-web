@@ -2,8 +2,18 @@ import React, { useEffect, useState, useRef } from "react";
 import "../styles/Home.css";
 import { Link } from "react-router-dom";
 import axios from "axios";
+// ⬇️ add these
+import ImgHealth from "../assets/health.jpg";
+import ImgNutrition from "../assets/hero-1.jpg";     // replace with your real nutrition image
+import ImgProtection from "../assets/hero-2.jpg";   // replace with your real protection image
+// local partner logos (src/assets/*)
+import LogoDRC from "../assets/DRC.png";
+import LogoOCHA from "../assets/OCHA.png";
+import Logowfp from "../assets/wfp.png";
+import LogoUNICEF from "../assets/UNICEF.png";
 
-/* ---------- API base detection (mirrors Projects.jsx) ---------- */
+
+/* ---------- API base detection ---------- */
 const LOCAL_BASE =
   (import.meta.env.VITE_API_URL ||
     import.meta.env.VITE_API_BASE_URL ||
@@ -16,22 +26,18 @@ const isLocalHost = ["localhost", "127.0.0.1", ""].includes(window.location.host
 const API_BASE = isLocalHost ? LOCAL_BASE : DEPLOY_BASE;
 const API = axios.create({ baseURL: API_BASE });
 
-/* ---------- Simplified URL helpers (like charity page) ---------- */
+/* ---------- URL helpers ---------- */
 const isBlobLike = (u = "") => /^blob:|^data:/i.test(String(u));
-
-// Simple URL formatter like in charity page
 const formatImageUrl = (url) => {
-  if (!url) return '';
-  if (url.startsWith('http') || isBlobLike(url)) return url;
-  if (url.startsWith('/uploads')) return `${API_BASE.replace('/api', '')}${url}`;
-  return `${API_BASE.replace('/api', '')}/uploads/${url}`;
+  if (!url) return "";
+  if (url.startsWith("http") || isBlobLike(url)) return url;
+  if (url.startsWith("/uploads")) return `${API_BASE.replace("/api", "")}${url}`;
+  return `${API_BASE.replace("/api", "")}/uploads/${url}`;
 };
-
-// Simplified slide source picker
 const pickSlideSrc = (s) => {
   if (s?.src) return formatImageUrl(s.src);
   const img0 = Array.isArray(s?.images) ? s.images[0] : undefined;
-  const img0Url = (img0 && typeof img0 === "object") ? (img0.url ?? img0.src ?? img0.path) : img0;
+  const img0Url = img0 && typeof img0 === "object" ? (img0.url ?? img0.src ?? img0.path) : img0;
   const candidate =
     s?.image ??
     s?.url ??
@@ -40,46 +46,15 @@ const pickSlideSrc = (s) => {
     (s?.filename ? `/uploads/images/${s.filename}` : "");
   return formatImageUrl(candidate);
 };
-
-// Simplified event cover picker
 const pickEventCover = (e) => {
   if (e?.coverImage) return formatImageUrl(e.coverImage);
   const img0 = Array.isArray(e?.images) ? e.images[0] : undefined;
-  const img0Url = (img0 && typeof img0 === "object") ? (img0.url ?? img0.src ?? img0.path) : img0;
-  const candidate =
-    e?.cover?.url ??
-    e?.image ??
-    img0Url ??
-    (e?.filename ? `/uploads/images/${e.filename}` : "");
+  const img0Url = img0 && typeof img0 === "object" ? (img0.url ?? img0.src ?? img0.path) : img0;
+  const candidate = e?.cover?.url ?? e?.image ?? img0Url ?? (e?.filename ? `/uploads/images/${e.filename}` : "");
   return formatImageUrl(candidate);
 };
 
-/* ---------- Icons ---------- */
-const IconEducation = () => (<svg className="icon" viewBox="0 0 24 24"><path d="M12 3 1 9l11 6 9-4.91V17h2V9L12 3z"/><path d="M4 10v6c0 1.1.9 2 2 2h4v-6L4 10z"/></svg>);
-const IconHealth = () => (<svg className="icon" viewBox="0 0 24 24"><path d="M16.5 3c-1.74 0-3.41.81-4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5 2 14.54 11.5 21 12 21s10-6.46 10-12.5C22 5.42 19.58 3 16.5 3z"/></svg>);
-const IconWater = () => (<svg className="icon" viewBox="0 0 24 24"><path d="M12 2S5 9 5 13.5 8.58 21 12 21s7-3.13 7-7.5S12 2 12 2zM12 19c-2.49 0-4.5-2.02-4.5-4.5S9.51 10 12 10s4.5 2.02 4.5 4.5S14.49 19 12 19z"/></svg>);
-const IconEmpower = () => (<svg className="icon" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-3.33 0-10 1.67-10 5v1h20v-1c0-3.33-6.67-5-10-5z"/></svg>);
-const IconVolunteer = () => (<svg className="icon" viewBox="0 0 24 24"><path d="M1 21h22l-2-7H3l-2 7zm16-9a3 3 0 0 0 3-3V4h-2v5a1 1 0 0 1-2 0V4h-2v5a1 1 0 0 1-2 0V4H8v5a3 3 0 0 0 3 3h6z"/></svg>);
-const IconDonate = () => (<svg className="icon" viewBox="0 0 24 24"><path d="M12 21s-8-4.5-8-10a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 5.5-8 10-8 10z"/></svg>);
-const IconDisability = () => (<svg className="icon" viewBox="0 0 24 24"><path d="M12 4a3 3 0 1 1 0 6 3 3 0 0 1 0-6ZM5 20a7 7 0 0 1 14 0H5Z"/><path d="M11 11h2v4h4v2h-6z"/></svg>);
-const IconReligion = () => (<svg className="icon" viewBox="0 0 24 24"><path d="m12 2 2.2 5H19l-4 3 1.5 5L12 13l-4.5 2 1.5-5-4-3h4.8z"/></svg>);
-const IconPublic = () => (<svg className="icon" viewBox="0 0 24 24"><path d="M8 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm8 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M2 20v-1c0-2.8 4-4 6-4s6 1.2 6 4v1H2Zm14 0v-1c0-1.3-.5-2.3-1.3-3.1 1.2-.4 2.6-.6 3.3-.6 2 0 6 1.2 6 4v1h-8z"/></svg>);
-const IconGrants = () => (<svg className="icon" viewBox="0 0 24 24"><path d="m12 2 3 5 6 .8-4.3 3.9L18 18l-6-3-6 3 1.3-6.3L3 7.8 9 7z"/></svg>);
-
-/* Social icons */
-const Social = {
-  X: () => (<svg viewBox="0 0 24 24" className="social-ic"><path d="M14.7 3h4.3l-9.4 10.7L19 21h-4.3l-6.1-7-2.8 3.2V21H2V3h3.8v9.1z"/></svg>),
-  Facebook: () => (<svg viewBox="0 0 24 24" className="social-ic"><path d="M13 22v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3V2h-3a5 5 0 0 0-5 5v3H6v4h3v8z"/></svg>),
-  Instagram: () => (<svg viewBox="0 0 24 24" className="social-ic"><path d="M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5zm0 2a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V7a3 3 0 0 0-3-3zm5 3a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm6.5-.75a1.25 1.25 0 1 1-2.5 0 1.25 1.25 0 0 1 2.5 0z"/></svg>),
-  YouTube: () => (<svg viewBox="0 0 24 24" className="social-ic"><path d="M22 8.2v7.6c0 1.6-1.3 2.2-2.9 2.2H4.9C3.3 18 2 17.4 2 15.8V8.2C2 6.6 3.3 6 4.9 6h14.2C20.7 6 22 6.6 22 8.2zM10 9l6 3-6 3V9z"/></svg>),
-  LinkedIn: () => (<svg viewBox="0 0 24 24" className="social-ic"><path d="M6 9h3v10H6zM7.5 5A1.5 1.5 0 1 1 6 6.5 1.5 1.5 0 0 1 7.5 5zM11 9h3v1.5h.1A3.3 3.3 0 0 1 17 9c3 0 4 2 4 4.6V19h-3v-4c0-1 0-2.3-1.4-2.3s-1.6 1-1.6 2.2V19h-3z"/></svg>),
-  TikTok: () => (<svg viewBox="0 0 24 24" className="social-ic"><path d="M21 8.5a6.6 6.6 0 0 1-4-1.3v7.2A6.4 6.4 0 1 1 8.2 8.2v3A3.4 3.4 0 1 0 11.5 15V3h3a6.5 6.5 0 0 0 6.5 6.5z"/></svg>),
-  WhatsApp: () => (<svg viewBox="0 0 24 24" className="social-ic"><path d="M20 4a10 10 0 0 0-16 12L3 21l5-1a10 10 0 0 0 12-16zm-3.1 12.5c-.4 1-2.4 1-3.3.8s-2.2-.8-3.7-2.2-2-2.6-2.2-3.7.2-2.9.8-3.3.8-.3 1.1 0l1.6 1.8c.1.1.2.4.1.6s-.5 1-.7 1.2-.2.4 0 .7a7.3 7.3 0 0 0 2.1 2.1c.3.2.5.2.7 0s1-.6 1.2-.7.5 0 .6.1l1.8 1.6c.2.3.2.8-.1 1.1z"/></svg>),
-  Telegram: () => (<svg viewBox="0 0 24 24" className="social-ic"><path d="m21 3-19 8 6.8 2.1L10 21l3.6-4.8L19 20z"/></svg>),
-  Mail: () => (<svg viewBox="0 0 24 24" className="social-ic"><path d="M2 6h20v12H2z"/><path d="m2 6 10 7L22 6"/></svg>),
-};
-
-/* ---------- CountUp ---------- */
+/* ---------- Tiny CountUp ---------- */
 function CountUp({ end, start = 0, duration = 1500, compact = false, suffix = "" }) {
   const ref = useRef(null);
   const [text, setText] = useState(compact ? "0" : "0");
@@ -103,21 +78,22 @@ function CountUp({ end, start = 0, duration = 1500, compact = false, suffix = ""
     }
 
     const io = new IntersectionObserver(
-      (entries) => entries.forEach((e) => {
-        if (e.isIntersecting && !startedRef.current) {
-          startedRef.current = true;
-          const t0 = performance.now();
-          const ease = (t) => 1 - Math.pow(1 - t, 3);
-          const step = (now) => {
-            const p = Math.min((now - t0) / duration, 1);
-            const value = Math.round(start + (end - start) * ease(p));
-            setText(format(value) + (p >= 1 ? suffix : ""));
-            if (p < 1) requestAnimationFrame(step);
-          };
-          requestAnimationFrame(step);
-          io.disconnect();
-        }
-      }),
+      (entries) =>
+        entries.forEach((e) => {
+          if (e.isIntersecting && !startedRef.current) {
+            startedRef.current = true;
+            const t0 = performance.now();
+            const ease = (t) => 1 - Math.pow(1 - t, 3);
+            const step = (now) => {
+              const p = Math.min((now - t0) / duration, 1);
+              const value = Math.round(start + (end - start) * ease(p));
+              setText(format(value) + (p >= 1 ? suffix : ""));
+              if (p < 1) requestAnimationFrame(step);
+            };
+            requestAnimationFrame(step);
+            io.disconnect();
+          }
+        }),
       { threshold: 0.25 }
     );
     io.observe(el);
@@ -138,41 +114,31 @@ export default function Home() {
   const [eventsLoading, setEventsLoading] = useState(true);
   const [eventsError, setEventsError] = useState("");
 
-  const stripTags = (html = "") => html.replace(/<[^>]*>/g, " ");
-  const truncate = (s = "", n = 160) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
-  const fmtDate = (d) => {
-    const dt = d ? new Date(d) : null;
-    if (!dt || Number.isNaN(dt.getTime())) return "";
-    return dt.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
-  };
-
-  /* Slides */
+  /* SLIDES: fetch published & sorted (max 3) */
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         const { data } = await API.get("/slides");
-        const raw = Array.isArray(data) ? data : (data?.items || data?.slides || []);
-        const published = raw
+        const raw = Array.isArray(data) ? data : data?.items || data?.slides || [];
+        const normalized = raw
           .filter((s) => s?.published === true)
           .sort((a, b) => (a?.position ?? 0) - (b?.position ?? 0))
-          .slice(0, 3);
-
-        const normalized = published.map((s, i) => {
-          const base = pickSlideSrc(s); // absolute /uploads/... url
-          return {
-            id: s?._id || s?.id || i,
-            src: formatImageUrl(base),
-            alt: (s?.alt && String(s.alt)) || "Slide image",
-            title: (s?.title && String(s.title)) || "",
-            subtitle: (s?.subtitle && String(s.subtitle)) || "",
-            align: (s?.align && String(s.align).toLowerCase()) || "left",
-            overlay: Number(s?.overlay ?? 40),
-          };
-        });
+          .slice(0, 3)
+          .map((s, i) => {
+            const src = pickSlideSrc(s);
+            return {
+              id: s?._id || s?.id || i,
+              src,
+              alt: s?.alt || "Slide",
+              title: s?.title || "",
+              subtitle: s?.subtitle || "",
+              overlay: Number(s?.overlay ?? 62), // darker by default so text pops
+            };
+          });
         if (mounted) setSlides(normalized);
-      } catch (e) {
-        console.error("Slides fetch failed:", e);
+      } catch {
+        if (mounted) setSlides([]);
       } finally {
         if (mounted) setLoadingSlides(false);
       }
@@ -180,7 +146,7 @@ export default function Home() {
     return () => (mounted = false);
   }, []);
 
-  /* Events */
+  /* EVENTS */
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -188,28 +154,25 @@ export default function Home() {
         setEventsLoading(true);
         setEventsError("");
         const { data } = await API.get("/events/public", { params: { limit: 6 } });
-        const list = Array.isArray(data) ? data : (data?.items || data?.events || []);
-        const norm = list.map((e, i) => {
-          const id = e?._id || e?.id || i;
-          const title = String(e?.title || e?.name || "Untitled");
-          const coverBase = pickEventCover(e);
-          const category = (e?.category && (e.category.name || e.category)) || "Event";
-          const location = e?.location || e?.city || "";
-          const when = e?.date || e?.publishedAt || e?.createdAt || null;
-          const desc = truncate(stripTags(e?.description || e?.excerpt || ""), 160);
-          return {
-            id,
-            title,
-            cover: formatImageUrl(coverBase),
-            category,
-            location,
-            whenLabel: fmtDate(when),
-            desc,
-          };
-        });
+        const list = Array.isArray(data) ? data : data?.items || data?.events || [];
+        const stripTags = (html = "") => html.replace(/<[^>]*>/g, " ");
+        const truncate = (s = "", n = 160) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
+        const fmtDate = (d) => {
+          const dt = d ? new Date(d) : null;
+          if (!dt || Number.isNaN(dt.getTime())) return "";
+          return dt.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
+        };
+        const norm = list.map((e, i) => ({
+          id: e?._id || e?.id || i,
+          title: String(e?.title || e?.name || "Untitled"),
+          cover: formatImageUrl(pickEventCover(e)),
+          category: (e?.category && (e.category.name || e.category)) || "Event",
+          location: e?.location || e?.city || "",
+          whenLabel: fmtDate(e?.date || e?.publishedAt || e?.createdAt || null),
+          desc: truncate(stripTags(e?.description || e?.excerpt || ""), 160),
+        }));
         if (mounted) setEvents(norm);
-      } catch (e) {
-        console.error("Events fetch failed:", e);
+      } catch {
         if (mounted) setEventsError("Could not load events right now.");
       } finally {
         if (mounted) setEventsLoading(false);
@@ -218,282 +181,265 @@ export default function Home() {
     return () => (mounted = false);
   }, []);
 
-  /* UI helpers */
-  const showHeroText = !loadingSlides && slides.length > 0;
-  const current = slides[currentSlide] || {};
-
-  useEffect(() => {
-    const els = document.querySelectorAll(".reveal");
-    const io = new IntersectionObserver(
-      (entries) => entries.forEach((e) => e.isIntersecting && e.target.classList.add("in-view")),
-      { threshold: 0.15 }
-    );
-    els.forEach((el) => io.observe(el));
-    if (showHeroText) {
-      document.querySelectorAll(".hero-text-content .reveal").forEach((el) => el.classList.add("in-view"));
-    }
-    return () => io.disconnect();
-  }, [showHeroText]);
-
+  /* slider autoplay */
   useEffect(() => {
     let interval;
     if (isAutoPlaying && slides.length > 1) {
-      interval = setInterval(() => setCurrentSlide((p) => (p + 1) % slides.length), 5000);
+      interval = setInterval(() => setCurrentSlide((p) => (p + 1) % slides.length), 6000);
     }
     return () => clearInterval(interval);
   }, [isAutoPlaying, slides.length]);
 
-  const goToSlide = (i) => {
+  const go = (i) => {
     setCurrentSlide(i);
     setIsAutoPlaying(false);
-    setTimeout(() => setIsAutoPlaying(true), 10000);
+    setTimeout(() => setIsAutoPlaying(true), 8000);
   };
-  const prev = () => goToSlide((currentSlide - 1 + slides.length) % slides.length);
-  const next = () => goToSlide((currentSlide + 1) % slides.length);
+  const prev = () => go((currentSlide - 1 + slides.length) % slides.length);
+  const next = () => go((currentSlide + 1) % slides.length);
 
-  /* Newsletter mock */
+  /* WHAT WE DO – static images + links (match your sample) */
+/* WHAT WE DO – static images + links (local assets) */
+const whatWeDo = [
+  { key: "health",     title: "HEALTH",     image: ImgHealth,     to: "/projects?tag=health" },
+  { key: "nutrition",  title: "NUTRITION",  image: ImgNutrition,  to: "/projects?tag=nutrition" },
+  { key: "protection", title: "PROTECTION", image: ImgProtection, to: "/projects?tag=protection" },
+];
+
+
+  /* PARTNERS – auto-scroll strip; you can load from API if you have one */
+// PARTNERS – local assets
+const [partners] = useState([
+  { name: "DRC",    logo: LogoDRC },
+  { name: "OCHA",        logo: LogoOCHA },
+  { name: "WFP",      logo: Logowfp },
+  { name: "UNICEF",logo: LogoUNICEF },
+]);
+
+
+  // If you later expose /partners/public, uncomment:
+  /*
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await API.get("/partners/public");
+        const list = Array.isArray(data) ? data : data?.items || [];
+        if (list.length) {
+          setPartners(
+            list.map((p, i) => ({
+              name: p?.name || `Partner ${i + 1}`,
+              logo: formatImageUrl(p?.logo || p?.image || ""),
+            }))
+          );
+        }
+      } catch {}
+    })();
+  }, []);
+  */
+
+  /* Newsletter (footer) */
   const onSubscribe = (e) => {
     e.preventDefault();
-    const form = new FormData(e.currentTarget);
-    const email = form.get("email");
+    const email = new FormData(e.currentTarget).get("email");
     if (!email) return;
     alert(`Thanks! We'll keep you updated at ${email}`);
     e.currentTarget.reset();
   };
 
+  const showSlides = !loadingSlides && slides.length > 0;
+  const slide = slides[currentSlide] || null;
+
   return (
     <>
       <main className="home" role="main">
-        {/* SPLIT-SCREEN HERO */}
-        <section className="hero-section">
-          <div className="hero-container container-wide">
-            {/* Image half */}
-            <div className="hero-images">
-              {!showHeroText && (
-                <div className="hero-image-wrapper active">
-                  <div className="hero-image hero-skeleton" aria-hidden="true" />
-                </div>
-              )}
-              {slides.map((img, i) => {
-                const eager = i === 0;
-                return (
-                  <div key={img.id ?? i} className={`hero-image-wrapper ${i === currentSlide ? "active" : ""}`}>
-                    <img
-                      src={img.src}
-                      alt={img.alt?.trim() || "Homepage slide"}
-                      className="hero-image"
-                      loading={eager ? "eager" : "lazy"}
-                      fetchPriority={eager ? "high" : "low"}
-                      decoding="async"
-                      onError={(e) => {
-                        // Try direct URL if the formatted one fails
-                        const directUrl = img.src.startsWith('/') 
-                          ? `${API_BASE.replace('/api', '')}${img.src}`
-                          : img.src;
-                        if (directUrl && e.currentTarget.src !== directUrl) {
-                          e.currentTarget.src = directUrl;
-                          return;
-                        }
-                        e.currentTarget.classList.add("hero-image--error");
-                        e.currentTarget.style.background = "var(--img-fallback, #eaeff2)";
-                        console.error("Failed to load hero image:", img.src);
-                      }}
-                    />
-                  </div>
-                );
-              })}
-            </div>
+        {/* ================= HERO SLIDER (dark image, big text) ================= */}
+        <section className="hero-slider">
+          {showSlides ? (
+            <>
+{slides.map((s, i) => (
+  <div
+    key={s.id}
+    className={`slide ${i === currentSlide ? "active" : ""}`}
+    style={{ '--overlay': Math.min(Math.max(s.overlay ?? 62, 20), 90) }}
+  >
+    <img
+      src={s.src}
+      alt={s.alt || "Slide"}
+      className="slide-img"
+      loading={i === 0 ? "eager" : "lazy"}
+      fetchPriority={i === 0 ? "high" : "low"}
+      decoding="async"
+    />
+    <div className="slide-shade" />
+    <div className="container slide-inner">
+      <div className="slide-text">
+        <h1 className="slide-title">{s.title}</h1>
+        {s.subtitle && <p className="slide-sub">{s.subtitle}</p>}
+        <div className="slide-actions">
+          {/* buttons… */}
+        </div>
+      </div>
+    </div>
+  </div>
+))}
 
-            {/* Text half */}
-            {showHeroText && (
-              <div className="hero-content">
-                <div className="hero-text-content">
-                  <span className="hero-badge reveal">Non-Profit | Community First</span>
-                  <h1 className="hero-title reveal">{current.title?.trim() || "Headline goes here"}</h1>
-                  <p className="hero-subtitle reveal">{current.subtitle?.trim() || "Subtitle shows here"}</p>
-                  <div className="hero-actions reveal">
-                    <Link to="/donate" className="btn btn-primary sheen">Donate</Link>
-                    <Link to="/volunteers" className="btn btn-ghost">Volunteer</Link>
+
+              {slides.length > 1 && (
+                <>
+                  <button className="nav-arrow left" onClick={prev} aria-label="Previous slide">‹</button>
+                  <button className="nav-arrow right" onClick={next} aria-label="Next slide">›</button>
+                  <div className="dots" role="tablist" aria-label="Choose slide">
+                    {slides.map((_, idx) => (
+                      <button
+                        key={idx}
+                        className={`dot ${idx === currentSlide ? "active" : ""}`}
+                        onClick={() => go(idx)}
+                        role="tab"
+                        aria-selected={idx === currentSlide}
+                        aria-label={`Go to slide ${idx + 1}`}
+                      />
+                    ))}
                   </div>
+                </>
+              )}
+            </>
+          ) : (
+            <div className="slide skeleton">
+              <div className="slide-shade" />
+              <div className="slide-inner container-wide">
+                <div className="slide-text">
+                  <h1 className="slide-title">Loading…</h1>
                 </div>
               </div>
-            )}
-
-            {slides.length > 1 && (
-              <>
-                <button className="bg-arrow left" onClick={prev} aria-label="Previous image">‹</button>
-                <button className="bg-arrow right" onClick={next} aria-label="Next image">›</button>
-                <div className="carousel-dots" role="tablist" aria-label="Choose slide">
-                  {slides.map((_, index) => (
-                    <button
-                      key={index}
-                      className={`dot ${index === currentSlide ? "active" : ""}`}
-                      onClick={() => goToSlide(index)}
-                      role="tab"
-                      aria-selected={index === currentSlide}
-                      aria-label={`Go to slide ${index + 1}`}
-                    />
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        </section>
-
-        {/* WHAT WE DO */}
-        <section className="section container what-we-do" aria-labelledby="what-title">
-          <h2 id="what-title" className="reveal">What We Do</h2>
-          <p className="muted center reveal">Programs designed with local partners to create lasting impact.</p>
-
-          <div className="charity-focus reveal">
-            <div className="focus-item"><IconDisability /> Disability</div>
-            <div className="focus-item"><IconReligion /> Religious Activities</div>
-            <div className="focus-item"><IconPublic /> The General Public / Mankind</div>
-            <div className="focus-item"><IconGrants /> Grants to Individuals</div>
-            <div className="focus-item"><IconGrants /> Grants to Organisations</div>
-          </div>
-
-          <div className="cards">
-            <Link to="/projects" className="card card-edu reveal tilt">
-              <div className="card-icon"><IconEducation /></div>
-              <h3>Education Access</h3>
-              <p>Scholarships, school kits, and teacher support for every child's future.</p>
-              <span className="chip">Learn more →</span>
-            </Link>
-            <Link to="/projects" className="card card-health reveal tilt">
-              <div className="card-icon"><IconHealth /></div>
-              <h3>Healthcare Support</h3>
-              <p>Mobile clinics, telemedicine, and maternal health initiatives.</p>
-              <span className="chip">See programs →</span>
-            </Link>
-            <Link to="/projects" className="card card-water reveal tilt">
-              <div className="card-icon"><IconWater /></div>
-              <h3>Clean Water</h3>
-              <p>Wells, filtration, and hygiene training for safe communities.</p>
-              <span className="chip">Explore work →</span>
-            </Link>
-            <Link to="/projects" className="card card-empower reveal tilt">
-              <div className="card-icon"><IconEmpower /></div>
-              <h3>Empowerment</h3>
-              <p>Skills, micro-grants, and youth programs for independence.</p>
-              <span className="chip">Get inspired →</span>
-            </Link>
-          </div>
-        </section>
-
-        {/* RECENT EVENTS */}
-        <section className="section container mission" aria-labelledby="recent-events-title">
-          <div className="mission-head">
-            <h2 id="recent-events-title" className="reveal">Recent Events</h2>
-          </div>
-
-          {eventsLoading && (
-            <div className="events-grid">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <article key={i} className="event-card skeleton" aria-hidden="true">
-                  <div className="cover" />
-                  <div className="meta">
-                    <div className="date" />
-                    <div className="title" />
-                    <div className="desc" />
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-
-          {!eventsLoading && eventsError && <div className="events-error">{eventsError}</div>}
-          {!eventsLoading && !eventsError && events.length === 0 && (
-            <div className="events-empty">No events yet. Please check back soon.</div>
-          )}
-
-          {!eventsLoading && !eventsError && events.length > 0 && (
-            <div className="events-grid">
-              {events.map((ev) => (
-                <article key={ev.id} className="event-card hover-pop">
-                  <div className="cover" aria-hidden="true">
-                    {ev.cover ? (
-                      <img
-                        className="cover-img"
-                        src={ev.cover}
-                        alt={ev.title}
-                        loading="lazy"
-                        decoding="async"
-                        onError={(e) => {
-                          // Try direct URL if the formatted one fails
-                          const directUrl = ev.cover.startsWith('/') 
-                            ? `${API_BASE.replace('/api', '')}${ev.cover}`
-                            : ev.cover;
-                          if (directUrl && e.currentTarget.src !== directUrl) {
-                            e.currentTarget.src = directUrl;
-                            return;
-                          }
-                          e.currentTarget.style.visibility = "hidden";
-                        }}
-                      />
-                    ) : null}
-                  </div>
-                  <div className="meta">
-                    <div className="top">
-                      <span className="badge">{ev.category}</span>
-                      {ev.whenLabel && <span>{ev.whenLabel}</span>}
-                    </div>
-                    <h3 className="title">{ev.title}</h3>
-                    <p className="desc">{ev.desc}</p>
-                    {ev.location && <small className="loc">📍 {ev.location}</small>}
-                  </div>
-                </article>
-              ))}
             </div>
           )}
         </section>
 
-        {/* MISSION */}
+        {/* ================= WHAT WE DO (3 image tiles with blue caption) ================= */}
+        <section className="section container what-grid" aria-labelledby="what-we-do">
+          <h2 id="what-we-do" className="center what-title">WHAT WE DO</h2>
+
+          <div className="what-cards">
+          {whatWeDo.map((w) => (
+            <Link key={w.key} to={w.to} className="what-card">
+              <div className="what-media">
+                <img src={w.image} alt={w.title} loading="lazy" decoding="async" />
+              </div>
+              <div className="what-cap">{w.title}</div>
+            </Link>
+          ))}
+        </div>
+
+        </section>
+
+        {/* ================= RECENT EVENTS (kept from your page) ================= */}
+<section className="section container mission" aria-labelledby="recent-events-title">
+  <div className="mission-head">
+    <h2 id="recent-events-title">Recent Events</h2>
+  </div>
+
+  {eventsLoading && (
+    <div className="events-grid">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <article key={i} className="event-card skeleton" aria-hidden="true">
+          <div className="cover" />
+          <div className="meta">
+            <div className="date" />
+            <div className="title" />
+            <div className="desc" />
+          </div>
+        </article>
+      ))}
+    </div>
+  )}
+
+  {!eventsLoading && eventsError && <div className="events-error">{eventsError}</div>}
+
+  {!eventsLoading && !eventsError && events.length === 0 && (
+    <div className="events-empty">No events yet. Please check back soon.</div>
+  )}
+
+  {!eventsLoading && !eventsError && events.length > 0 && (
+    <div className="events-grid">
+      {events.map((ev) => (
+        <Link
+          key={ev.id}
+          to={`/events/${ev.id}`}
+          state={{ event: { ...ev, when: ev.when ?? ev.whenLabel ?? null } }}
+          className="event-card hover-pop"
+          aria-label={`Open details for ${ev.title}`}
+        >
+          <div className="cover" aria-hidden="true">
+            {ev.cover ? (
+              <img
+                className="cover-img"
+                src={ev.cover}
+                alt={ev.title}
+                loading="lazy"
+                decoding="async"
+                onError={(e) => (e.currentTarget.style.visibility = "hidden")}
+              />
+            ) : null}
+          </div>
+
+          <div className="meta">
+            <div className="top">
+              <span className="badge">{ev.category}</span>
+              {ev.whenLabel && <span>{ev.whenLabel}</span>}
+            </div>
+            <h3 className="title">{ev.title}</h3>
+            <p className="desc">{ev.desc}</p>
+            {ev.location && <small className="loc">📍 {ev.location}</small>}
+          </div>
+        </Link>
+      ))}
+    </div>
+  )}
+</section>
+
+
+        {/* ================= MISSION / STATS / CTAs (kept) ================= */}
         <section className="section container mission" aria-labelledby="mission-title-2">
-          <h2 id="mission-title-2" className="reveal">Our Mission</h2>
-          <p className="mission-text reveal">
+          <h2 id="mission-title-2">Our Mission</h2>
+          <p className="mission-text">
             To empower children and families through access to quality education, essential healthcare, and sustainable
             community projects—delivered with transparency, dignity, and local partnership.
           </p>
-          <ul className="pill-list reveal" aria-label="Mission focus areas">
-            <li><IconEducation /> Education</li>
-            <li><IconHealth /> Health</li>
-            <li><IconWater /> Water &amp; Sanitation</li>
-            <li><IconEmpower /> Women &amp; Youth</li>
+          <ul className="pill-list" aria-label="Mission focus areas">
+            <li>Education</li>
+            <li>Health</li>
+            <li>Water &amp; Sanitation</li>
+            <li>Women &amp; Youth</li>
           </ul>
         </section>
 
-        {/* STATS */}
         <section className="section container stats" aria-label="Impact statistics">
-          <article className="stat reveal hover-pop">
+          <article className="stat hover-pop">
             <span className="num"><CountUp end={120} suffix="+" /></span>
             <span className="label">Projects Funded</span>
           </article>
-          <article className="stat reveal hover-pop">
+          <article className="stat hover-pop">
             <span className="num"><CountUp end={30000} compact suffix="+" /></span>
             <span className="label">People Reached</span>
           </article>
-          <article className="stat reveal hover-pop">
+          <article className="stat hover-pop">
             <span className="num"><CountUp end={50} suffix="+" /></span>
             <span className="label">Active Volunteers</span>
           </article>
-          <article className="stat reveal hover-pop">
+          <article className="stat hover-pop">
             <span className="num"><CountUp end={15} /></span>
             <span className="label">Partner Communities</span>
           </article>
         </section>
 
-        {/* GET INVOLVED */}
         <section className="section container get-involved" aria-label="Get involved">
           <div className="cta-grid">
-            <Link to="/donate" className="cta-card shine reveal">
-              <div className="cta-icon"><IconDonate /></div>
+            <Link to="/donate" className="cta-card shine">
               <h3>Donate</h3>
               <p>Your gift funds urgent needs and long-term solutions.</p>
               <span className="cta-btn">Give Now</span>
             </Link>
-            <Link to="/volunteers" className="cta-card outline reveal">
-              <div className="cta-icon"><IconVolunteer /></div>
+            <Link to="/volunteers" className="cta-card outline">
               <h3>Volunteer</h3>
               <p>Join hands-on projects or remote support teams.</p>
               <span className="cta-btn">Join Us</span>
@@ -501,18 +447,53 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Secondary CTA */}
         <section className="section container cta">
-          <h3 className="reveal">See our latest work</h3>
-          <p className="reveal">Browse ongoing initiatives and real stories from the field.</p>
-          <div className="cta-actions reveal">
+          <h3>See our latest work</h3>
+          <p>Browse ongoing initiatives and real stories from the field.</p>
+          <div className="cta-actions">
             <Link to="/projects" className="btn btn-primary sheen">View Projects</Link>
             <Link to="/contact" className="btn btn-ghost">Contact Us</Link>
           </div>
         </section>
       </main>
 
-      {/* FOOTER */}
+{/* ================= PARTNERS (auto-scrolling logos) ================= */}
+<section className="section partners-wrap" aria-label="Our Partners">
+  <div className="container">
+    <h2 className="partners-title">OUR PARTNERS</h2>
+  </div>
+
+  <div className="partners-track">
+    {(() => {
+      // one lane = your partners duplicated so it's wider than the screen
+      const lane = partners.concat(partners);
+      return (
+        <>
+          {/* lane A */}
+          <ul className="partners-row">
+            {lane.map((p, i) => (
+              <li key={`laneA-${p.name}-${i}`} className="partner">
+                <img src={p.logo} alt={p.name} loading="lazy" decoding="async" />
+              </li>
+            ))}
+          </ul>
+
+          {/* lane B (same content), phase-shifted so there’s no gap */}
+          <ul className="partners-row clone" aria-hidden="true">
+            {lane.map((p, i) => (
+              <li key={`laneB-${p.name}-${i}`} className="partner">
+                <img src={p.logo} alt={p.name} loading="lazy" decoding="async" />
+              </li>
+            ))}
+          </ul>
+        </>
+      );
+    })()}
+  </div>
+</section>
+
+
+      {/* FOOTER stays as-is in your layout */}
       <footer className="site-footer" role="contentinfo">
         <div className="footer-top">
           <div className="container footer-grid">
@@ -524,18 +505,10 @@ export default function Home() {
                 Transparent, community-driven aid. We partner locally to deliver education, healthcare,
                 clean water, and opportunity—responsibly and at scale.
               </p>
-
-              <div className="footer-social" aria-label="Social media">
-                <a href="https://facebook.com" target="_blank" rel="noreferrer" aria-label="Facebook"><Social.Facebook /></a>
-                <a href="https://x.com" target="_blank" rel="noreferrer" aria-label="X (Twitter)"><Social.X /></a>
-                <a href="https://instagram.com" target="_blank" rel="noreferrer" aria-label="Instagram"><Social.Instagram /></a>
-                <a href="https://youtube.com" target="_blank" rel="noreferrer" aria-label="YouTube"><Social.YouTube /></a>
-                <a href="https://linkedin.com" target="_blank" rel="noreferrer" aria-label="LinkedIn"><Social.LinkedIn /></a>
-                <a href="https://tiktok.com" target="_blank" rel="noreferrer" aria-label="TikTok"><Social.TikTok /></a>
-                <a href="https://wa.me/252" target="_blank" rel="noreferrer" aria-label="WhatsApp"><Social.WhatsApp /></a>
-                <a href="https://t.me/" target="_blank" rel="noreferrer" aria-label="Telegram"><Social.Telegram /></a>
-                <a href="mailto:info@charityhope.org" aria-label="Email"><Social.Mail /></a>
-              </div>
+              <form className="news-form" onSubmit={onSubscribe}>
+                <input type="email" name="email" placeholder="Your email address" required />
+                <button className="btn btn-ghost" type="submit">Subscribe</button>
+              </form>
             </div>
 
             <nav className="footer-links" aria-label="Quick links">
@@ -553,28 +526,15 @@ export default function Home() {
               <h4>Make an Impact</h4>
               <p>Your support provides essentials today and builds resilience for tomorrow.</p>
               <Link to="/donate" className="btn btn-primary sheen footer-donate-btn">Donate Now</Link>
-              <div className="payment-badges" aria-hidden="true">
-                <span className="pay-badge">EVC</span>
-                <span className="pay-badge">E-Dahab</span>
-                <span className="pay-badge">Visa</span>
-                <span className="pay-badge">Mastercard</span>
-              </div>
             </div>
 
             <div className="footer-news">
               <h4>Newsletter</h4>
               <p>Get field stories and project updates (1–2×/month).</p>
               <form className="news-form" onSubmit={onSubscribe}>
-                <input
-                  type="email"
-                  name="email"
-                  placeholder="Your email address"
-                  aria-label="Email address"
-                  required
-                />
+                <input type="email" name="email" placeholder="Your email address" required />
                 <button className="btn btn-ghost" type="submit">Subscribe</button>
               </form>
-              <small className="foot-note">We respect your privacy. Unsubscribe any time.</small>
             </div>
           </div>
         </div>
@@ -591,10 +551,9 @@ export default function Home() {
         </div>
       </footer>
 
-      {/* Floating Donate */}
       <div className="floating-donate">
         <Link to="/donate" className="floating-donate-btn sheen" aria-label="Donate">
-          <IconDonate /> <span>Donate</span>
+          <span>❤</span> <span>Donate</span>
         </Link>
       </div>
     </>
